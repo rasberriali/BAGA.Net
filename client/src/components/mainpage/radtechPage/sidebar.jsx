@@ -7,7 +7,7 @@ import vector from '../../../images/Vector@2x.png';
 import notif from '../../../images/Vector3.png';
 import patient from '../../../images/Group@2x.png';
 import message from '../../../images/Vector4.png';
-import contact from '../../../images/vector2@2x.png';
+import contact from '../../../images/Vector2@2x.png';
 import tech from '../../../images/Vector6.png';
 import settings from '../../../images/Vector5.png';
 import toggle_btn from "../../../images/toggle_btn.png";
