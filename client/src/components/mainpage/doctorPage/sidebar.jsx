@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import bagalogo from '../../../images/bagalogo.png';
 import user from '../../../images/user.png';
 import sets from '../../../images/sets.png';
-import vector from '../../../images/vector.png';
+import vector from '../../../images/Vector.png';
 import notif from '../../../images/notif.png';
 import patient from '../../../images/patient.png';
 import message from '../../../images/message.png';
