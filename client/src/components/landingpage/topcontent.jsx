@@ -7,16 +7,16 @@ const Topcontent = () => {
   return (
     <div className='mt-2'>
     
-       <section className="container mx-auto flex justify-between items-center py-20 px-2 ">
+       <section className="container mx-auto flex justify-between items-center py-20 px-6">
         <div className="container mx-auto flex flex-col md:flex-row items-center">
           <div className="md:w-3/6 ">
           <img src={xray} alt="Xray" className=" object-contain rounded-lg shadow-sm" /> 
           </div>
           <div className="md:w-1/2 md:pl-12 mt-8 md:mt-0 text-center md:text-left">
-            <h1 className="text-4xl font-bold text-gray-800">
+            <h1 className="xl:text-4xl md:text-3xl text-xl font-bold text-gray-800">
               Welcome to BAGA.NET
             </h1>
-            <h2 className="text-5xl font-bold text-gray-900 mt-4">
+            <h2 className="xl:text-5xl md:text-3xl text-2xl font-bold text-gray-900 mt-4 ">
               Revolutionizing Lung Disease Classification with FedML
             </h2>
             <p className="text-gray-700 mt-4">

@@ -10,7 +10,7 @@ const FeaturesList = () => {
 
   return (
     <section>
-      <div className="container mx-auto px-2">
+      <div className="container mx-auto px-6">
         <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">Features Lists</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Feature Card 1 */}
@@ -49,7 +49,7 @@ const FeaturesList = () => {
         
 
         {showMore && (
-          <div className="mt-8 ">
+          <div className=" ">
             {/* Last Feature Card */}
             <div className="bg-white p-6 rounded-lg shadow-md ">
               <div className="flex items-center mb-4">

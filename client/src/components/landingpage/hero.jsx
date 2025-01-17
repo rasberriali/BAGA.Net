@@ -1,37 +1,123 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import bagalogo from '../../images/bagalogo.png';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Spin as Hamburger } from "hamburger-react"; // Importing the Hamburger component
+import { motion } from "framer-motion"; // Importing motion for animations
+import {
+  FaHome,
+  FaInfoCircle,
+  FaProjectDiagram,
+  FaEnvelope,
+} from "react-icons/fa"; // Importing icons
+import bagalogo from "../../images/bagalogo.png";
 
 const Hero = () => {
+  const [isSidebarOpen, setSidebarOpen] = useState(false); // Track if sidebar is open
   const navigate = useNavigate();
 
   return (
     <nav className="mt-10">
       <div className="container mx-auto flex justify-between items-center py-4 px-8 bg-white shadow-lg rounded-sm">
+        {/* Logo Section */}
         <div className="flex items-center">
-          <img src={bagalogo} alt="Baga" className="h-5 object-contain" />
-          <span className="text-xl font-bold ml-2">BAGA.NET</span>
+          <img src={bagalogo} alt="Baga" className="xl:h-5 h-10 object-contain" />
+          <span className="text-xl font-bold ml-2 hidden sm:block">BAGA.NET</span>
         </div>
-        <div className="space-x-14">
-          <a href="#" className="text-gray-700 hover:text-blue-600">Home</a>
-          <a href="#" className="text-gray-700 hover:text-blue-600">About</a>
-          <a href="#" className="text-gray-700 hover:text-blue-600">Models</a>
-          <a href="#" className="text-gray-700 hover:text-blue-600">Contacts</a>
+
+        {/* Menu Button and Links */}
+        <div className="flex items-center space-x-8">
+          {/* Menu Button for Small Screens */}
+          <div className="lg:hidden">
+            <Hamburger toggled={isSidebarOpen} toggle={setSidebarOpen} />
+          </div>
+
+          {/* Navbar Links (Hidden on Small Screens) */}
+          <div className="hidden lg:flex space-x-14">
+            <a href="#" className="text-gray-700 hover:text-blue-600">
+              Home
+            </a>
+            <a href="#" className="text-gray-700 hover:text-blue-600">
+              About
+            </a>
+            <a href="#" className="text-gray-700 hover:text-blue-600">
+              Models
+            </a>
+            <a href="#" className="text-gray-700 hover:text-blue-600">
+              Contacts
+            </a>
+          </div>
         </div>
-        <div className="space-x-4">
+
+        {/* Login and Sign-Up Buttons */}
+        <div className="space-x-4 hidden lg:flex">
           <button
             className="text-gray-700 hover:text-blue-600"
-            onClick={() => navigate('/login')}
+            onClick={() => navigate("/login")}
           >
             Login
           </button>
-          <button className="bg-teal-500 text-white px-4 py-2 rounded hover:bg-blue-700"
-           onClick={() => navigate('/signup')}
-           >Sign Up</button>
+          <button
+            className="bg-teal-500 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={() => navigate("/signup")}
+          >
+            Sign Up
+          </button>
         </div>
       </div>
+
+      {/* Sidebar/Tooltip Menu */}
+      {isSidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="absolute top-16 right-4 bg-[#2c2f3e] text-purple-200 rounded-lg shadow-lg py-4 px-6 w-48 z-50"
+        >
+          <div className="flex flex-col space-y-4">
+            <div
+              className="flex items-center space-x-2 cursor-pointer hover:text-purple-500"
+              onClick={() => {
+                setSidebarOpen(false);
+                navigate("/");
+              }}
+            >
+              <FaHome />
+              <span>Home</span>
+            </div>
+            <div
+              className="flex items-center space-x-2 cursor-pointer hover:text-purple-500"
+              onClick={() => {
+                setSidebarOpen(false);
+                navigate("/about");
+              }}
+            >
+              <FaInfoCircle />
+              <span>About</span>
+            </div>
+            <div
+              className="flex items-center space-x-2 cursor-pointer hover:text-purple-500"
+              onClick={() => {
+                setSidebarOpen(false);
+                navigate("/models");
+              }}
+            >
+              <FaProjectDiagram />
+              <span>Projects</span>
+            </div>
+            <div
+              className="flex items-center space-x-2 cursor-pointer hover:text-purple-500"
+              onClick={() => {
+                setSidebarOpen(false);
+                navigate("/contact");
+              }}
+            >
+              <FaEnvelope />
+              <span>Contact</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </nav>
   );
-}
+};
 
 export default Hero;

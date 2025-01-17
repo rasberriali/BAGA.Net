@@ -25,7 +25,7 @@ function Signup() {
   const handleSubmit = (e) => {
     e.preventDefault();
     axios
-      .post('http://localhost:3001/signup', { username, email, password, role }) // Add role to the post data
+      .post('http://localhost:3000/signup', { username, email, password, role }) // Add role to the post data
       .then((result) => {
         console.log(result);
         navigate('/login');

@@ -15,7 +15,7 @@ import Dashboard from './components/mainpage/radtechPage/dashboard';
 import PatientActivity from './components/mainpage/radtechPage/patientActivity';
 import Doctorsdashboard from './components/mainpage/doctorPage/doctors-dashboard';
 import DoctorsViewPatientActivity from './components/mainpage/doctorPage/doctorsView-patientActivity';
-
+// import Haha from "./components/landingpage/haha"
 
 
 
@@ -28,6 +28,7 @@ function Home() {
       <About />
       <FeaturesList />
       <PreTrainedModels />
+    
     </>
   );
 }
