@@ -20,7 +20,7 @@ const Hero = () => {
         {/* Logo Section */}
         <div className="flex items-center">
           <img src={bagalogo} alt="Baga" className="xl:h-5 h-10 object-contain" />
-          <span className="text-xl font-bold ml-2 hidden sm:block">BAGA.NET</span>
+          <span className="text-xl font-bold ml-2 hidden sm:block ">BAGA.NET</span>
         </div>
 
         {/* Menu Button and Links */}
@@ -48,7 +48,7 @@ const Hero = () => {
         </div>
 
         {/* Login and Sign-Up Buttons */}
-        <div className="space-x-4 hidden lg:flex">
+        <div className="space-x-4  lg:flex">
           <button
             className="text-gray-700 hover:text-blue-600"
             onClick={() => navigate("/login")}

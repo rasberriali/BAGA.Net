@@ -19,6 +19,7 @@ import DoctorsViewPatientActivity from './components/mainpage/doctorPage/doctors
 
 
 
+
 function Home() {
   return (
     <>
@@ -28,7 +29,6 @@ function Home() {
       <About />
       <FeaturesList />
       <PreTrainedModels />
-    
     </>
   );
 }
