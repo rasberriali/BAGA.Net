@@ -11,7 +11,7 @@ const PretrainedModels = () => {
       <div className="relative flex flex-row justify-center items-center mx-auto  w-5/6 ">
         <div className="  mt-16">
          
-        <h1 className="flex flex-row justify-center items-center text-4xl font-semibold text-slate-200">Empowering Diagnostics with Advanced AI Models</h1>
+        <h1 className="flex flex-row justify-center items-center  xl:text-4xl md:text-3xl text-2xl text-center font-semibold text-gray-800">Empowering Diagnostics with Advanced AI Models</h1>
       
 
         <div className="text-white mt-12 grid xl:grid-cols-3 grid-cols-1 gap-4  p-6">

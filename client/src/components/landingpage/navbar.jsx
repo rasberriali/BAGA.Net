@@ -5,7 +5,7 @@ import call from '../../images/call.png';
 
 const Navbar = () => {
   return (
-    <div className="bg-gray-800 text-white text-sm md:text-base">
+    <div className="bg-gray-800 text-white text-sm xl:text-xs">
       <div className="container mx-auto py-2 px-8 flex items-center justify-between">
         <div className="flex items-center">
           <div className="pr-2 hidden sm:block">
