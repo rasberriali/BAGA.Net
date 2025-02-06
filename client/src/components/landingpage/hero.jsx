@@ -15,18 +15,18 @@ const Hero = () => {
   const navigate = useNavigate();
 
   return (
-    <nav className="mt-10">
-      <div className="container mx-auto flex justify-between items-center py-4 px-8 bg-white shadow-lg rounded-sm">
+    <nav className="xl:mt-10">
+      <div className="container mx-auto flex justify-between items-center py-4 px-8  shadow-lg rounded-sm">
         {/* Logo Section */}
         <div className="flex items-center">
-          <img src={bagalogo} alt="Baga" className="xl:h-5 h-10 object-contain" />
+          <img src={bagalogo} alt="Baga" className="xl:h-5 h-10 object-contain  hidden sm:block" />
           <span className="text-xl font-bold ml-2 hidden sm:block ">BAGA.NET</span>
         </div>
 
         {/* Menu Button and Links */}
         <div className="flex items-center space-x-8">
           {/* Menu Button for Small Screens */}
-          <div className="lg:hidden">
+          <div className="lg:hidden ">
             <Hamburger toggled={isSidebarOpen} toggle={setSidebarOpen} />
           </div>
 
