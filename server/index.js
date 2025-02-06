@@ -1,40 +1,26 @@
-const express = require("express")
-const mongoose = require('mongoose')
-const cors = require("cors")
-const EmployeeModel = require('./models/Employee')
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const projectRoutes = require("./routes/projectRoutes");
 
-const app = express()
-app.use(express.json())
-app.use(cors())
+const app = express();
 
-mongoose.connect("mongodb://127.0.0.1:27017/employee")
+const corsOptions = {
+  origin: "http://localhost:5173",
+  methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-app.post('/login', (req,res) => {
-    const {email,password} = req.body;
+app.use(express.json({ limit: "10mb" }));
+app.use(cors(corsOptions));
 
-    EmployeeModel.findOne({email: email})
-    .then(user => {
-        if (user) {
-            if (user.password === password) {
-                res.json({message:"Success",role:user.role})
-            }else{
-                res.json("the password is incorrect")
-            }
-            }else{
-                res.json("No record existed")
-            }
-        })
-        .catch(err=> res.json(err))
-})
+mongoose
+  .connect("mongodb://127.0.0.1:27017/baganet")
+  .then(() => console.log("Connected to baganet database"))
+  .catch((err) => console.log("Error connecting to database:", err));
 
-app.post('/signup', (req,res) => {
-    const {username, email, password, role} = req.body;
-    EmployeeModel.create({username, email, password, role})
-    .then(user =>res.json(user))
-    .catch(err => res.json(err))
-
-})
+app.use("/patients", projectRoutes);
 
 app.listen(3000, () => {
-    console.log("bitch it is running")
-})
+  console.log("Server is running on port 3000");
+});

@@ -39,7 +39,7 @@ function Signup() {
 
     // Send data to backend
     axios
-      .post('http://localhost:3000/signup', {
+      .post('http://localhost:3000/patients/signup', {
         username,
         lastName,
         email,

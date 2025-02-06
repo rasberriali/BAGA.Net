@@ -110,7 +110,7 @@ const DragNdrop = ({
               <p className="text-xs font-bold">{files.length} image(s) selected</p>
             </div>
           )}
-        </div>
+        </div>    
       )}
 
       {/* Submit Button */}

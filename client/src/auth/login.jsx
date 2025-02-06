@@ -20,7 +20,7 @@ function Login() {
     e.preventDefault();
     setIsLoading(true);
     axios
-      .post('http://localhost:3000/login', { email, password, rememberMe })  // Send rememberMe status
+      .post('http://localhost:3000/patients/login', { email, password, rememberMe })  // Send rememberMe status
       .then((response) => {
         setIsLoading(false);  // Hide loader
         if (response.data.message === 'Success') {

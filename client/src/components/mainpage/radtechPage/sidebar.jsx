@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import bagalogo from '../../../images/bagalogo.png';
 import user from '../../../images/user.png';
 import sets from '../../../images/sets.png';
@@ -14,21 +14,27 @@ import toggle_btn from "../../../images/toggle_btn.png";
 
 const Sidebar = () => {
     const navigate = useNavigate();
+    const location = useLocation(); // Track current path
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
     const toggleSidebar = () => {
         setIsSidebarVisible(!isSidebarVisible);
     };
 
-    const SidebarItem = ({ icon, label, path }) => (
-        <div
-            className="flex items-center hover:bg-[#009099] rounded px-4 py-2 cursor-pointer"
-            onClick={() => navigate(path)}
-        >
-            <img src={icon} alt={label} className="object-contain" />
-            {isSidebarVisible && <span className="ml-4 text-white">{label}</span>}
-        </div>
-    );
+    const SidebarItem = ({ icon, label, path }) => {
+        const isActive = location.pathname === path; // Check if current path matches
+
+        return (
+            <div
+                className={`flex items-center px-4 py-2 cursor-pointer rounded 
+                ${isActive ? 'bg-[#005f6b]' : 'hover:bg-[#009099]'}`} // Active color
+                onClick={() => navigate(path)}
+            >
+                <img src={icon} alt={label} className="object-contain" />
+                {isSidebarVisible && <span className="ml-4 text-white">{label}</span>}
+            </div>
+        );
+    };
 
     return (
         <div className={`relative flex flex-col ${isSidebarVisible ? 'w-64' : 'w-16'} bg-[#283342] h-full transition-all duration-300`}>
@@ -63,10 +69,10 @@ const Sidebar = () => {
             </div>
 
             {/* Navigation Links */}
-            <nav className="text-white text-base mt-4">
+            <nav className="text-white text-base mt-4 ">
                 <SidebarItem icon={vector} label="Dashboard" path="/dashboard" />
                 <SidebarItem icon={patient} label="Patient Records" path="/patientActivity" />
-                <SidebarItem icon={contact} label="Contact Management" path="/contact-management" />
+                <SidebarItem icon={contact} label="Contact Management" path="/contactManagement" />
                 <SidebarItem icon={notif} label="Notifications" path="/notifications" />
                 <SidebarItem icon={message} label="Chat with Doctors" path="/chat-with-doctors" />
             </nav>
@@ -77,7 +83,7 @@ const Sidebar = () => {
                 <SidebarItem icon={settings} label="Settings" path="/settings" />
                 <SidebarItem icon={tech} label="Get Technical Help" path="/technical-help" />
             </nav>
-            
+
             {/* Footer */}
             <div className='bg-[#1D242E] p-4 text-center text-xs text-white'>
                 Powered by BAGA.NET © 2024

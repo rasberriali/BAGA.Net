@@ -39,7 +39,7 @@ const Navbar = () => {
 
         {/* Greeting and Date/Time */}
         <div>
-          <h1 className="text-gray-700 font-semibold">Good Morning</h1>
+          <h1 className="text-gray-700 font-semibold">Good Afternoon</h1>
           <p className="text-sm text-gray-500">{currentDateTime}</p>
         </div>
       </div>
