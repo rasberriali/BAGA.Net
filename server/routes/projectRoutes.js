@@ -31,7 +31,7 @@ router.post("/login", (req, res) => {
     .then((user) => {
       if (user) {
         if (user.password === password) {
-          res.json({ message: "Success", role: user.role });
+          res.json({ message: "Success",username: user.username, role: user.role });
         } else {
           res.status(401).json({ message: "The password is incorrect" });
         }
@@ -93,6 +93,24 @@ router.delete("/deletePatient/:id", (req, res) => {
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
+
+router.get("/doctors", async (req, res) => {
+  try {
+    const doctors = await UserAuthModel.find({ role: "doctor" }).select("username");
+    
+    const validDoctors = doctors.filter((doc) => doc.username);
+
+    res.status(200).json(validDoctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
 
 
 module.exports = router;

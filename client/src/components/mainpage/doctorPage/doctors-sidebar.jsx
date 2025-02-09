@@ -12,14 +12,12 @@ import tech from '../../../images/Vector6.png';
 import settings from '../../../images/Vector5.png';
 import toggle_btn from "../../../images/toggle_btn.png";
 
-const Sidebar = () => {
+const DoctorsSidebar = () => {
     const navigate = useNavigate();
     const location = useLocation(); // Track current path
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-    
-    const username = localStorage.getItem('username') || 'User'; // Default to 'User' if not found
-    
 
+    const username = localStorage.getItem('username') || 'User'; // Default to 'User' if not found
 
     const toggleSidebar = () => {
         setIsSidebarVisible(!isSidebarVisible);
@@ -64,7 +62,7 @@ const Sidebar = () => {
                 {isSidebarVisible && (
                     <div className="flex flex-col ml-2">
                         <span className="text-white font-medium text-lg">{username}</span> {/* Display Username */}
-                        <span className="text-yellow-400 font-normal text-xs">Radtech</span>
+                        <span className="text-yellow-400 font-normal text-xs">Doctor</span>
                     </div>
                 )}
                 {isSidebarVisible && (
@@ -74,9 +72,9 @@ const Sidebar = () => {
 
             {/* Navigation Links */}
             <nav className="text-white text-base mt-4 ">
-                <SidebarItem icon={vector} label="Dashboard" path="/dashboard" />
-                <SidebarItem icon={patient} label="Patient Records" path="/patientActivity" />
-                <SidebarItem icon={contact} label="Contact Management" path="/contactManagement" />
+                <SidebarItem icon={vector} label="Dashboard" path="/doctors-dashboard" />
+                <SidebarItem icon={patient} label="Patient Records" path="/doctorsView-patientActivity" />
+                <SidebarItem icon={contact} label="Contact Management" path="/doctors-contactManagement" />
                 <SidebarItem icon={notif} label="Notifications" path="/notifications" />
                 <SidebarItem icon={message} label="Chat with Doctors" path="/chat-with-doctors" />
             </nav>
@@ -96,4 +94,4 @@ const Sidebar = () => {
     );
 };
 
-export default Sidebar;
+export default DoctorsSidebar;

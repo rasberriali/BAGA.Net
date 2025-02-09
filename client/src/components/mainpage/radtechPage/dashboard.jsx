@@ -1,5 +1,5 @@
 import React from 'react';
-import Navbar from '../doctorPage/navbar';
+import Navbar from '../doctorPage/doctors-navbar';
 import Sidebar from '../radtechPage/sidebar';
 import Charts from '../radtechPage/charts';
 import dashPatient from '../../../images/dashPatient.png'

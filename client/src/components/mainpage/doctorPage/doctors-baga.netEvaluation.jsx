@@ -15,15 +15,7 @@ export default function BAGANETEvaluation() {
             <dzv className='text-base '>
                 Classified Disease 
             </dzv>
-          </div>    
-          <div className=' w-1/6 flex flex-row justify-center items-end text-white   '>
-          <button
-                className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-900"
-               
-              >
-                Generate
-              </button>
-          </div>    
+          </div>
         </div>
       
     </div>

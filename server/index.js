@@ -20,6 +20,8 @@ mongoose
   .catch((err) => console.log("Error connecting to database:", err));
 
 app.use("/patients", projectRoutes);
+app.use(projectRoutes);
+
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");

@@ -19,25 +19,38 @@ function Login() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoading(true);
-    axios
-      .post('http://localhost:3000/patients/login', { email, password, rememberMe })  // Send rememberMe status
+  
+    axios.post('http://localhost:3000/patients/login', { email, password })
       .then((response) => {
-        setIsLoading(false);  // Hide loader
+        setIsLoading(false);
+        console.log("API Response:", response.data); // Debugging API response
+  
         if (response.data.message === 'Success') {
+          // Get username from response (not from email)
+          const username = response.data.username || "Guest"; 
+          localStorage.setItem('username', username);
+  
           if (response.data.role === 'doctor') {
             navigate('/doctorsPage');
           } else if (response.data.role === 'radtech') {
             navigate('/radtechsPage');
+          } else {
+            navigate('/'); // Default route
           }
         } else {
-          alert(response.data);  // Show error messages
+          alert(response.data);
         }
       })
       .catch((err) => {
-        setIsLoading(false);  // Hide loader
-        alert('Login failed. Please try again.');  // Error handling
+        setIsLoading(false);
+        console.error("Login error:", err);
+        alert('Login failed. Please try again.');
       });
   };
+  
+  
+  
+  
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">

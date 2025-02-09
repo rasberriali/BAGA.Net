@@ -285,22 +285,23 @@ const PatientActivity = () => {
                     <td className="px-6 py-2">{patient.location}</td>
                     <td className="px-6 py-2">{patient.gender}</td>
                     <td className="px-6 py-2">{patient.age}</td>
-                    <td className="px-6 py-2">
-                    {patient.xray && patient.xray.length > 0 ? (
-  <div className="flex flex-wrap space-x-2">
-    {patient.xray.map((xrayImage, index) => (
-      <img
-        key={index}
-        src={`data:image/jpeg;base64,${xrayImage}`} // Fix: Ensure correct Base64 format
-        alt={`X-ray ${index}`}
-        className="w-40 h-40 object-cover rounded-md"
-      />
-    ))}
-  </div>
-) : (
-  <p>No X-ray images available</p>
-)}
-</td>
+                    <td className="px-6 py-2"> {patient.xray && patient.xray.length > 0 ?
+                    
+                    (
+                    <div className="flex flex-wrap space-x-2">
+                      {patient.xray.map((xrayImage, index) => (
+                        <img
+                          key={index}
+                          src={`data:image/jpeg;base64,${xrayImage}`} // Fix: Ensure correct Base64 format
+                          alt={`X-ray ${index}`}
+                          className="w-40 h-40 object-cover rounded-md"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p>No X-ray images available</p>
+                  )}
+                  </td>
 
                     <td className="px-6 py-2 flex space-x-2">
                       <Update id={patient.id} />

@@ -1,7 +1,7 @@
 import search from '../../../images/search.png';
 import eng from '../../../images/eng.png';
 
-const Navbar = () => {
+const DoctorsNavbar = () => {
   const currentDateTime = new Date().toLocaleString('en-US', {
     day: 'numeric', 
     month: 'long', 
@@ -47,4 +47,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar;
+export default DoctorsNavbar;
