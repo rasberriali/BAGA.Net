@@ -15,8 +15,8 @@ import Dashboard from './components/mainpage/radtechPage/dashboard';
 import PatientActivity from './components/mainpage/radtechPage/patientActivity';
 import Doctorsdashboard from './components/mainpage/doctorPage/doctors-dashboard';
 import ContactManagement from './components/mainpage/radtechPage/contactManagement';
-import DoctorsViewPatientActivity from './components/mainpage/doctorPage/doctorsView-patientActivity';
 import DoctorscontactManagement from './components/mainpage/doctorPage/doctors-contactManagement';
+import DoctorsPatientActivity from './components/mainpage/doctorPage/doctors-patientActivity';
 // import Haha from "./components/landingpage/haha"
 
 
@@ -47,7 +47,7 @@ function App() {
         <Route path="/radtechsPage" element={<RadtechsPage />} />
         <Route path="/dashboard" element={<Dashboard/>}/>
         <Route path="/doctors-dashboard" element={<Doctorsdashboard/>}/>
-        <Route path="/doctorsView-patientActivity" element={<DoctorsViewPatientActivity/>}/>
+        <Route path="/doctors-patientActivity" element={<DoctorsPatientActivity/>}/>
         <Route path="/patientActivity" element={<PatientActivity/>}/>
         <Route path="/contactManagement" element={<ContactManagement/>}/>
         <Route path="/doctors-contactManagement" element={<DoctorscontactManagement/>}/>
