@@ -6,8 +6,9 @@ const PatientDetailsSchema = new mongoose.Schema({
   age: { type: Number, required: true },
   gender: { type: String, required: true },
   xray: { type: [String], required: false }, // Array of base64 strings
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' }
 });
 
 // Model for the 'patientDetails' collection
-const PatientDetailsModel = mongoose.model("patientDetails", PatientDetailsSchema);
+const PatientDetailsModel = mongoose.model("PatientDetails", PatientDetailsSchema);
 module.exports = PatientDetailsModel;
