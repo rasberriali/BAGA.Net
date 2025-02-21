@@ -1,6 +1,6 @@
 import React from 'react';
 import Navbar from './doctors-navbar';
-import PatientActivity from './doctorsView-patientActivity';
+import PatientActivity from './doctors-patientActivity';
 import Sidebar from './doctors-sidebar';
 import Charts from './charts';
 import dashPatient from '../../../images/dashPatient.png'

@@ -73,7 +73,7 @@ const DoctorsSidebar = () => {
             {/* Navigation Links */}
             <nav className="text-white text-base mt-4 ">
                 <SidebarItem icon={vector} label="Dashboard" path="/doctors-dashboard" />
-                <SidebarItem icon={patient} label="Patient Records" path="/doctorsView-patientActivity" />
+                <SidebarItem icon={patient} label="Patient Records" path="/doctors-patientActivity" />
                 <SidebarItem icon={contact} label="Contact Management" path="/doctors-contactManagement" />
                 <SidebarItem icon={notif} label="Notifications" path="/notifications" />
                 <SidebarItem icon={message} label="Chat with Doctors" path="/chat-with-doctors" />

@@ -1,7 +1,10 @@
+const mongoose = require("mongoose");
 const express = require("express");
 const multer = require("multer");
 const UserAuthModel = require("../models/UserAuth");
 const PatientDetailsModel = require("../models/PatientDetails");
+const DoctorsPatientDetails = require("../models/doctorsPatientDetails");
+
 
 const router = express.Router();
 
@@ -31,7 +34,18 @@ router.post("/login", (req, res) => {
     .then((user) => {
       if (user) {
         if (user.password === password) {
-          res.json({ message: "Success",username: user.username, role: user.role });
+          const response = { 
+            message: "Success", 
+            username: user.username, 
+            role: user.role 
+          };
+
+          // Include doctorId if the user is a doctor
+          if (user.role === "doctor") {
+            response.doctorId = user._id;
+          }
+
+          res.json(response);
         } else {
           res.status(401).json({ message: "The password is incorrect" });
         }
@@ -41,6 +55,7 @@ router.post("/login", (req, res) => {
     })
     .catch((err) => res.status(500).json({ error: err.message }));
 });
+
 
 router.post("/signup", (req, res) => {
   const { username, email, password, role } = req.body;
@@ -69,15 +84,20 @@ router.get("/patients", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-// Update Patient
-router.put("/updatePatient/:id", (req, res) => {
-  const { id } = req.params;
-  const { name, location, age, gender, xray } = req.body;
+// router.get("/patients", (req, res) => {
+//   PatientDetailsModel.find()
+//     .then((patients) => res.status(200).json(patients))
+//     .catch((err) => res.status(500).json({ error: err.message }));
+// });
+// // Update Patient
+// router.put("/updatePatient/:id", (req, res) => {
+//   const { id } = req.params;
+//   const { name, location, age, gender, xray } = req.body;
 
-  PatientDetailsModel.findByIdAndUpdate(id, { name, location, age, gender, xray }, { new: true })
-    .then((patient) => res.status(200).json(patient))
-    .catch((err) => res.status(500).json({ error: err.message }));
-});
+//   PatientDetailsModel.findByIdAndUpdate(id, { name, location, age, gender, xray }, { new: true })
+//     .then((patient) => res.status(200).json(patient))
+//     .catch((err) => res.status(500).json({ error: err.message }));
+// });
 
 // Delete Patient
 router.delete("/deletePatient/:id", (req, res) => {
@@ -94,15 +114,62 @@ router.delete("/deletePatient/:id", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-router.get("/doctors", async (req, res) => {
+router.post('/assign-to-doctor', async (req, res) => {
   try {
-    const doctors = await UserAuthModel.find({ role: "doctor" }).select("username");
-    
-    const validDoctors = doctors.filter((doc) => doc.username);
+    const { patientId, doctorId } = req.body;
 
-    res.status(200).json(validDoctors);
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(patientId) || !mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(400).json({ error: "Invalid patientId or doctorId format." });
+    }
+
+    // Find Patient
+    const patient = await PatientDetailsModel.findById(patientId);
+    if (!patient) return res.status(404).json({ error: "Patient not found." });
+
+    // Find Doctor
+    const doctor = await UserAuthModel.findById(doctorId);
+    if (!doctor) return res.status(404).json({ error: "Doctor not found." });
+
+    // Check if patient is already assigned
+    const existingEntry = await DoctorsPatientDetails.findOne({ patientId, doctorId });
+    if (!existingEntry) {
+      await DoctorsPatientDetails.create({
+        patientId,
+        doctorId,
+        patientDetails: {
+          name: patient.name,
+          age: patient.age,
+          gender: patient.gender,
+          location: patient.location,
+          xray: patient.xray || [],
+        },
+      });
+    }
+
+    res.status(200).json({ message: "Patient assigned successfully." });
   } catch (err) {
+    console.error("Error during assignment:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(400).json({ error: "Invalid doctorId" });
+    }
+
+    // Fetch patients assigned to this doctor
+    const assignedPatients = await DoctorsPatientDetails.find({ doctorId })
+      .populate("patientId"); // This ensures we get full patient details
+
+    res.status(200).json(assignedPatients);
+  } catch (error) {
+    console.error("Error fetching assigned patients:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -110,7 +177,39 @@ router.get("/doctors", async (req, res) => {
 
 
 
+// Get patients assigned to a specific doctor
+// router.get("/doctor-patients/:doctorId", async (req, res) => {
+//   try {
+//     const { doctorId } = req.params;
+
+//     const assignedPatients = await DoctorsPatientDetails.find({ doctorId }).populate("patientId");
+//     res.status(200).json(assignedPatients);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+router.get('/doctors-patients/:doctorId', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    
+    const patients = await DoctorsPatientDetails.find({ doctorId });
+    
+    res.status(200).json(patients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
+// Get list of doctors
+router.get("/doctors", async (req, res) => {
+  try {
+    const doctors = await UserAuthModel.find({ role: "doctor" }).select("username _id");
+    res.status(200).json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;
