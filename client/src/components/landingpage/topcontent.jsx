@@ -15,7 +15,7 @@ const Topcontent = () => {
           </div>
           <div className="md:w-1/2 md:pl-12 mt-8 md:mt-0 text-center md:text-left">
             <h1 className="xl:text-2xl md:text-xl text-lg font-bold text-slate-600">
-              Welcome to <span className=''>BAGA.NET</span>
+              Welcome to <span className=''>.NET</span>
             </h1>
             <h2 className="xl:text-5xl md:text-3xl text-2xl font-bold text-slate-900 mt-4 ">
               Revolutionizing Lung Disease Classification with FedML
