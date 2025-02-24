@@ -1,36 +1,31 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Spin as Hamburger } from "hamburger-react"; // Importing the Hamburger component
-import { motion } from "framer-motion"; // Importing motion for animations
+import { Spin as Hamburger } from "hamburger-react"; 
+import { motion } from "framer-motion"; 
 import {
   FaHome,
   FaInfoCircle,
   FaProjectDiagram,
   FaEnvelope,
-} from "react-icons/fa"; // Importing icons
+} from "react-icons/fa"; 
 import bagalogo from "../../images/bagalogo.png";
 
 const Hero = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false); // Track if sidebar is open
+  const [isSidebarOpen, setSidebarOpen] = useState(false); 
   const navigate = useNavigate();
 
   return (
     <nav className="xl:mt-10">
       <div className="container mx-auto flex justify-between items-center py-4 px-8  shadow-lg rounded-sm">
-        {/* Logo Section */}
         <div className="flex items-center">
           <img src={bagalogo} alt="Baga" className="xl:h-5 h-10 object-contain  hidden sm:block" />
           <span className="text-xl font-bold ml-2 hidden sm:block ">BAGA.NET</span>
         </div>
 
-        {/* Menu Button and Links */}
         <div className="flex items-center space-x-8">
-          {/* Menu Button for Small Screens */}
           <div className="lg:hidden ">
             <Hamburger toggled={isSidebarOpen} toggle={setSidebarOpen} />
           </div>
-
-          {/* Navbar Links (Hidden on Small Screens) */}
           <div className="hidden lg:flex space-x-14">
             <a href="#" className="text-gray-700 hover:text-blue-600">
               Home
@@ -47,7 +42,6 @@ const Hero = () => {
           </div>
         </div>
 
-        {/* Login and Sign-Up Buttons */}
         <div className="space-x-4  lg:flex">
           <button
             className="text-gray-700 hover:text-blue-600"
@@ -64,7 +58,6 @@ const Hero = () => {
         </div>
       </div>
 
-      {/* Sidebar/Tooltip Menu */}
       {isSidebarOpen && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}

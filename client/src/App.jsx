@@ -7,16 +7,16 @@ import Navbar from './components/landingpage/navbar';
 import Hero from './components/landingpage/hero';
 import Topcontent from './components/landingpage/topcontent';
 import FeaturesList from './components/landingpage/features';
-import PreTrainedModels from './components/landingpage/models';
+import PreTrainedModels from './components/landingpage/models';     
 import About from './components/landingpage/about';
-import DoctorsPage from './components/mainpage/doctorPage/doctorsPage';
-import RadtechsPage from './components/mainpage/radtechPage/radtechsPage';
-import Dashboard from './components/mainpage/radtechPage/dashboard';
-import PatientActivity from './components/mainpage/radtechPage/patientActivity';
-import Doctorsdashboard from './components/mainpage/doctorPage/doctors-dashboard';
-import ContactManagement from './components/mainpage/radtechPage/contactManagement';
-import DoctorscontactManagement from './components/mainpage/doctorPage/doctors-contactManagement';
-import DoctorsPatientActivity from './components/mainpage/doctorPage/doctors-patientActivity';
+import DoctorsPage from './components/mainpage/doctorPage/dasboard-doctor/doctorsPage';
+import RadtechsPage from './components/mainpage/radtechPage/dashboard-radtech/radtechsPage';
+import Dashboard from './components/mainpage/radtechPage/dashboard-radtech/dashboard';
+import PatientActivity from './components/mainpage/radtechPage/patientRecords-radtech/patientActivity';
+import Doctorsdashboard from './components/mainpage/doctorPage/dasboard-doctor/doctors-dashboard';
+import ContactManagement from './components/mainpage/radtechPage/contactManagement-radtech/contactManagement';
+import DoctorscontactManagement from './components/mainpage/doctorPage/contactManagement-doctor/doctors-contactManagement';
+import DoctorsPatientActivity from './components/mainpage/doctorPage/patientRecord-doctor/doctors-patientActivity';
 // import Haha from "./components/landingpage/haha"
 
 
