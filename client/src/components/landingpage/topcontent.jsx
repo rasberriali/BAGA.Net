@@ -25,26 +25,19 @@ const Topcontent = () => {
               learning platform, designed for doctors and radiologic technologists.
             </p>
             <div className="relative inline-flex mt-6">
-  {/* Button */}
-  <button
-    className="relative border-2 border-teal-500 text-black  px-6 py-3 rounded-lg"
-    onClick={() => navigate('/hero')}
-  >
-    Discover More
-  </button>
 
-  {/* Ping animation in the top-right corner */}
-  <span className="absolute top-1 right-1 transform translate-x-1/2 -translate-y-1/2">
-    <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-teal-600 opacity-50"></span>
-    <span className="relative inline-flex rounded-full h-4 w-4 bg-teal-500"></span>
-  </span>
-</div>
+            <button
+              className="relative border-2 border-teal-500 text-black  px-6 py-3 rounded-lg"
+              onClick={() => navigate('/hero')}
+            >
+              Discover More
+            </button>
 
-
-
-            
-
-            
+            <span className="absolute top-1 right-1 transform translate-x-1/2 -translate-y-1/2">
+              <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-teal-600 opacity-50"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-teal-500"></span>
+            </span>
+          </div>
             
           </div>
         </div>

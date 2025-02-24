@@ -8,7 +8,7 @@ const DoctorsPatientDetailsSchema = new mongoose.Schema({
     age: { type: Number, required: true },
     gender: { type: String, required: true },
     location: { type: String, required: true },
-    xray: { type: [String], required: false }, // Assuming xray is an array of image URLs or base64 strings
+    xray: { type: [String], required: false },
   }
 });
 

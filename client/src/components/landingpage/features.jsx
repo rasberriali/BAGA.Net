@@ -13,7 +13,7 @@ const FeaturesList = () => {
       <div className="container mx-auto px-6">
         <div className='flex flex-col justify-center items-center p-4 mb-8 gap-4'>
         <h2 className="xl:text-4xl md:text-3xl text-2xl text-center font-semibold text-gray-800 ">Empowering Diagnosis Through Innovation</h2>
-        <h4 className=' xl:w-2/5 w-full text-center text-slate-700 xl:text-base text-xs '>Discover a suite of innovative features that enhance diagnostic precision, secure data integrity, and foster continuous learning for improved healthcare outcomes.</h4> </div>
+        <h4 className=' xl:w-3/5 w-full text-center text-slate-700 xl:text-base text-xs '>Discover a suite of innovative features that enhance diagnostic precision, secure data integrity, and foster continuous learning for improved healthcare outcomes.</h4> </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 mt-12">
           {/* Feature Card 1 */}
           <div className="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500">

@@ -7,6 +7,5 @@ const UserAuthSchema = new mongoose.Schema({
   role: { type: String, enum: ['doctor', 'radtech'], required: true }
 });
 
-// Model for the 'userAuth' collection
 const UserAuthModel = mongoose.model("userAuth", UserAuthSchema);
 module.exports = UserAuthModel;
