@@ -3,21 +3,18 @@ const express = require("express");
 const multer = require("multer");
 const UserAuthModel = require("../models/UserAuth");
 const PatientDetailsModel = require("../models/PatientDetails");
-const DoctorsPatientDetails = require("../models/doctorsPatientDetails");
-
 
 const router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, 
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpg|jpeg|png|gif/;
     const fileType = allowedTypes.test(file.mimetype);
-    
     if (fileType) {
-      cb(null, true); 
+      cb(null, true);
     } else {
       cb(new Error("Only image files are allowed!"), false);
     }
@@ -52,10 +49,8 @@ router.post("/login", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-
 router.post("/signup", (req, res) => {
   const { username, email, password, role } = req.body;
-
   UserAuthModel.create({ username, email, password, role })
     .then((user) => res.status(201).json(user))
     .catch((err) => res.status(500).json({ error: err.message }));
@@ -63,9 +58,7 @@ router.post("/signup", (req, res) => {
 
 router.post("/addPatient", upload.array("xray", 5), (req, res) => {
   const { name, location, age, gender } = req.body;
-  
   const xrayBase64 = req.files ? req.files.map(file => file.buffer.toString("base64")) : [];
-
   PatientDetailsModel.create({ name, location, age, gender, xray: xrayBase64 })
     .then((patient) => {
       console.log('Patient saved:', patient);
@@ -80,11 +73,9 @@ router.get("/patients", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
-
 router.delete("/deletePatient/:id", (req, res) => {
   const { id } = req.params;
   console.log("Received patient ID:", id); 
-  
   PatientDetailsModel.findByIdAndDelete(id)
     .then((patient) => {
       if (!patient) {
@@ -95,34 +86,19 @@ router.delete("/deletePatient/:id", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+// NEW ASSIGNMENT ROUTE: Update the PatientDetails record with doctorId
 router.post('/assign-to-doctor', async (req, res) => {
   try {
     const { patientId, doctorId } = req.body;
-
     if (!mongoose.Types.ObjectId.isValid(patientId) || !mongoose.Types.ObjectId.isValid(doctorId)) {
       return res.status(400).json({ error: "Invalid patientId or doctorId format." });
     }
-
     const patient = await PatientDetailsModel.findById(patientId);
     if (!patient) return res.status(404).json({ error: "Patient not found." });
 
-    const doctor = await UserAuthModel.findById(doctorId);
-    if (!doctor) return res.status(404).json({ error: "Doctor not found." });
-
-    const existingEntry = await DoctorsPatientDetails.findOne({ patientId, doctorId });
-    if (!existingEntry) {
-      await DoctorsPatientDetails.create({
-        patientId,
-        doctorId,
-        patientDetails: {
-          name: patient.name,
-          age: patient.age,
-          gender: patient.gender,
-          location: patient.location,
-          xray: patient.xray || [],
-        },
-      });
-    }
+    // Update patient record by assigning the doctor
+    patient.doctorId = doctorId;
+    await patient.save();
 
     res.status(200).json({ message: "Patient assigned successfully." });
   } catch (err) {
@@ -131,17 +107,14 @@ router.post('/assign-to-doctor', async (req, res) => {
   }
 });
 
+// NEW FETCH ASSIGNED PATIENTS: Query PatientDetails by doctorId
 router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
   try {
     const { doctorId } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
       return res.status(400).json({ error: "Invalid doctorId" });
     }
-
-    const assignedPatients = await DoctorsPatientDetails.find({ doctorId })
-      .populate("patientId"); 
-
+    const assignedPatients = await PatientDetailsModel.find({ doctorId });
     res.status(200).json(assignedPatients);
   } catch (error) {
     console.error("Error fetching assigned patients:", error);
@@ -149,16 +122,21 @@ router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
   }
 });
 
-
-router.get('/doctors-patients/:doctorId', async (req, res) => {
+// NEW Update Evaluation route: Update evaluation in PatientDetails
+router.put('/updateEvaluation/:id', async (req, res) => {
   try {
-    const { doctorId } = req.params;
-    
-    const patients = await DoctorsPatientDetails.find({ doctorId });
-    
-    res.status(200).json(patients);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { evaluation } = req.body;
+    const updatedPatient = await PatientDetailsModel.findByIdAndUpdate(
+      req.params.id,
+      { evaluation },
+      { new: true }
+    );
+    if (!updatedPatient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    res.status(200).json({ message: 'Evaluation updated successfully', patient: updatedPatient });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
