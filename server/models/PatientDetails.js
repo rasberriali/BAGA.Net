@@ -6,7 +6,8 @@ const PatientDetailsSchema = new mongoose.Schema({
   age: { type: Number, required: true },
   gender: { type: String, required: true },
   xray: { type: [String], required: false }, 
-  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' }
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
+  evaluation: {type: String, required:false } 
 });
 
 

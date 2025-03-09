@@ -28,7 +28,6 @@ function Update({ patientId }) {
 
 
     try {
-      // Post to assign the patient to the selected doctor
       await axios.post("http://localhost:3000/assign-to-doctor", { patientId, doctorId: selectedDoctor });
       alert("Patient assigned successfully!");
       closeModal();
