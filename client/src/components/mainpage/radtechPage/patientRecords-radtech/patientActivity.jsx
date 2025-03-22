@@ -303,7 +303,7 @@ const PatientActivity = () => {
                     <td className="px-6 py-2 flex space-x-2">
                       <Update patientId={patient._id} />
                         <Delete patientId={patient._id} onDelete={handlePatientDeletion} />
-                      <View id={patient.id} />
+                        <View patient={patient} />
                     </td>
                   </tr>
                 ))}

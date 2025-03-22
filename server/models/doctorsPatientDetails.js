@@ -9,7 +9,9 @@ const DoctorsPatientDetailsSchema = new mongoose.Schema({
     gender: { type: String, required: true },
     location: { type: String, required: true },
     xray: { type: [String], required: false },
+    
   }
 });
 
 module.exports = mongoose.model("DoctorsPatientDetails", DoctorsPatientDetailsSchema);
+
