@@ -140,6 +140,21 @@ router.put('/updateEvaluation/:id', async (req, res) => {
   }
 });
 
+
+//DASHBOARD
+router.get("/dashboard-counts", async (req, res) => {
+  try {
+    const totalDoctors = await UserAuthModel.countDocuments({ role: "doctor" });
+    const totalRadtechs = await UserAuthModel.countDocuments({ role: "radtech" });
+    const totalPatients = await PatientDetailsModel.countDocuments();
+
+    res.json({ totalDoctors, totalRadtechs, totalPatients });
+  } catch (error) {
+    console.error("Error fetching dashboard counts:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 router.get("/doctors", async (req, res) => {
   try {
     const doctors = await UserAuthModel.find({ role: "doctor" }).select("username _id");

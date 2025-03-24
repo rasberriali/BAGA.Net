@@ -117,17 +117,6 @@ function Login() {
             <div className="flex flex-row mt-4 justify-center">
               <div>Don't have an account? <span className="text-blue-600 cursor-pointer">Sign Up</span></div>
             </div>
-            <div className="mt-4">or sign in with</div>
-
-            {/* Social Login Buttons */}
-            <div className="flex flex-row gap-2 mt-4">
-              <div className="py-2 px-10 border border-slate-400 rounded-md cursor-pointer flex items-center gap-2">
-                <FcGoogle /> Google
-              </div>
-              <div className="py-2 px-10 border border-slate-400 rounded-md cursor-pointer flex items-center gap-2">
-                <FaApple /> Apple
-              </div>
-            </div>
           </div>
         </form>
       </div>

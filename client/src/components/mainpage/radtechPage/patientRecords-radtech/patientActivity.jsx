@@ -291,7 +291,7 @@ const PatientActivity = () => {
                           key={index}
                           src={`data:image/jpeg;base64,${xrayImage}`} 
                           alt={`X-ray ${index}`}
-                          className="w-40 h-40 object-cover rounded-md"
+                          className="2xl:w-40 2xl:h-40 lg:w-30 lg:h-30 object-cover rounded-md"
                         />
                       ))}
                     </div>
