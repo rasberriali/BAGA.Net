@@ -9,7 +9,12 @@
 "routes": [
   {
     "src": "/(.*)",
-    "dest": "/index.js"
+    "dest": "index.js"
   }
-]
+],
+"env": {
+  "NODE_ENV": "production",
+  "MONGO_URI": "@mongo_uri",
+  "JWT_SECRET": "@jwt_secret"
+}
 }

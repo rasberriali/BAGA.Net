@@ -40,7 +40,7 @@ const authLimiter = rateLimit({
 });
 
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: ["http://localhost:5173", "https://baga-net.vercel.app"],
   methods: ["GET", "POST", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -48,6 +48,23 @@ const corsOptions = {
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cors(corsOptions));
+
+// Root route handler
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'BAGA.NET API is running',
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // JWT Secret check
 if (!process.env.JWT_SECRET) {
@@ -73,7 +90,31 @@ app.use('/patients/signup', authLimiter);
 app.use('/patients', projectRoutes);
 app.use('/doctors', doctorRoutes);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ 
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    message: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+
+// Only start the server if we're not in a Vercel serverless function
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel
+module.exports = app;
