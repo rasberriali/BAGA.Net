@@ -2,19 +2,42 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const rateLimit = require('express-rate-limit');
 const projectRoutes = require("./routes/projectRoutes");
-
+const doctorRoutes = require("./routes/doctorRoutes");
 
 const app = express();
+
+// Rate limiting configuration
+const limiter = rateLimit({
+  windowMs: 30 * 60 * 1000, // 15 minutes
+  max: 300 // limit each IP to 100 requests per windowMs
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// Stricter rate limit for auth routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 1 hour
+  max: 10 // limit each IP to 5 requests per windowMs
+});
 
 const corsOptions = {
   origin: "http://localhost:5173",
   methods: ["GET", "POST", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
 };
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cors(corsOptions));
+
+// JWT Secret check
+if (!process.env.JWT_SECRET) {
+  console.error("JWT_SECRET is missing. Check your .env file.");
+  process.exit(1);
+}
 
 const mongoURI = process.env.MONGO_URI;
 if (!mongoURI) {
@@ -26,10 +49,15 @@ mongoose.connect(mongoURI)
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.error("MongoDB Connection Error:", err));
 
-app.use("/patients", projectRoutes);
-app.use(projectRoutes);
+// Apply auth rate limiting to auth routes
+app.use('/patients/login', authLimiter);
+app.use('/patients/signup', authLimiter);
 
+// Routes
+app.use('/patients', projectRoutes);
+app.use('/doctors', doctorRoutes);
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });

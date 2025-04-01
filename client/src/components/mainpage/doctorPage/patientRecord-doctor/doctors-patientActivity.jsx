@@ -23,9 +23,18 @@ const DoctorsPatientActivity = () => {
     }
 
     try {
-      // Note: Change URL to use the PatientDetails assignment route
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await axios.get(
-        `http://localhost:3000/patients/assign-to-doctor/${doctorId}`
+        `http://localhost:3000/patients/patients/assign-to-doctor/${doctorId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
       console.log("API Response:", response);
 
@@ -46,7 +55,7 @@ const DoctorsPatientActivity = () => {
       }
     } catch (error) {
       console.error("Error fetching assigned patients:", error);
-      setError("Failed to load patient data.");
+      setError(error.response?.data?.message || "Failed to load patient data.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +110,7 @@ const DoctorsPatientActivity = () => {
                           )}
                         </td>
                         <td className="px-6 py-2 flex space-x-2">
-                        <Update patientId={patient.id} xrayImages={patient.xray} />
+                          <Update patientId={patient.id} xrayImages={patient.xray} />
                           <View id={patient.id} />
                         </td>
                       </tr>

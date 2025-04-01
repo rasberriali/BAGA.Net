@@ -20,13 +20,23 @@ function Delete({ onDelete, patientId }) {
 
   const handleDelete = async () => {
     try {
-      const response = await axios.delete(`http://localhost:3000/patients/deletePatient/${patientId}`);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.delete(`http://localhost:3000/patients/deletePatient/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       console.log(response.data.message); 
       setIsDeleted(true);
       closeModal();
       onDelete();
     } catch (error) {
-      setErrorMessage("Failed to delete patient!");
+      setErrorMessage(error.response?.data?.message || "Failed to delete patient!");
       console.error("Error deleting patient:", error);
     }
   };
@@ -46,23 +56,25 @@ function Delete({ onDelete, patientId }) {
             <h2 className="text-lg font-bold mb-4 text-center">
               Are you sure you want to delete this?
             </h2>
-
-            <div className="flex justify-between items-center mt-10">
+            {errorMessage && (
+              <div className="text-red-500 text-sm mb-4 text-center">
+                {errorMessage}
+              </div>
+            )}
+            <div className="flex justify-center space-x-4">
               <button
-                className="px-4 py-2 bg-gray-500 rounded-md hover:bg-gray-600"
+                onClick={handleDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              >
+                Delete
+              </button>
+              <button
                 onClick={closeModal}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
               >
                 Cancel
               </button>
-              <button
-                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
-                onClick={handleDelete}
-              >
-                Yes
-              </button>
             </div>
-            {errorMessage && <p className="text-red-500 text-center mt-4">{errorMessage}</p>}
-            {isDeleted && <p className="text-green-500 text-center mt-4">Patient deleted successfully!</p>}
           </div>
         </div>
       )}

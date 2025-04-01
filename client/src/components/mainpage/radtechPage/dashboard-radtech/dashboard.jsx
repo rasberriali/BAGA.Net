@@ -10,7 +10,17 @@ function dashboard() {
   const [counts, setCounts] = useState({ totalDoctors: 0, totalRadtechs: 0, totalPatients: 0 });
 
   useEffect(() => {
-    axios.get("http://localhost:3000/dashboard-counts")
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      console.error('No authentication token found');
+      return;
+    }
+
+    axios.get("http://localhost:3000/patients/dashboard-counts", {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then((response) => {
         setCounts(response.data);
       })

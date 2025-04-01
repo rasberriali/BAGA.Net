@@ -13,35 +13,46 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
     try {
-      const response = await axios.post('http://localhost:3000/patients/login', { email, password });
-      console.log("Login Response:", response.data);
+      const response = await axios.post('http://localhost:3000/patients/login', { 
+        email, 
+        password 
+      });
 
       if (response.data.message === 'Success') {
+        // Store token securely
+        const token = response.data.token;
+        if (rememberMe) {
+          localStorage.setItem('token', token);
+        } else {
+          sessionStorage.setItem('token', token);
+        }
+
         // Store user data
         localStorage.setItem('username', response.data.username || "Guest");
-        localStorage.setItem('userId', response.data._id); // Store user ID
+        localStorage.setItem('userId', response.data._id);
+        localStorage.setItem('userRole', response.data.role);
 
         if (response.data.role === 'doctor') {
-          localStorage.setItem('doctorId', response.data.doctorId); // Store doctorId
+          localStorage.setItem('doctorId', response.data.doctorId);
           navigate('/doctorsPage');
         } else if (response.data.role === 'radtech') {
           navigate('/radtechsPage');
         } else {
-          navigate('/'); // Default route
+          navigate('/');
         }
-      } else {
-        alert(response.data.message);
       }
     } catch (error) {
       console.error("Login error:", error);
-      alert('Login failed. Please check your credentials.');
+      setError(error.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -53,6 +64,11 @@ function Login() {
         <div className="absolute top-0 opacity-30 rounded-t-lg left-0 w-full h-48 bg-gradient-to-b from-blue-500 to-transparent"></div>
 
         <h2 className="text-2xl font-semibold text-slate-900 mb-6 text-center">Welcome Back</h2>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
           {/* Email Input */}
           <div className="mb-4 relative">
@@ -89,7 +105,10 @@ function Login() {
                 className="w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring focus:border-blue-300"
                 required
               />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
+              <span 
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer" 
+                onClick={() => setShowPassword(!showPassword)}
+              >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </span>
             </div>
@@ -108,7 +127,11 @@ function Login() {
           </div>
 
           {/* Submit Button */}
-          <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center">
+          <button 
+            type="submit" 
+            className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center"
+            disabled={isLoading}
+          >
             {isLoading ? <FaSpinner className="animate-spin mr-2" /> : 'Login'}
           </button>
 

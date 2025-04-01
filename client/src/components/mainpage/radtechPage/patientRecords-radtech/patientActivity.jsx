@@ -20,7 +20,8 @@ const PatientActivity = () => {
   });
   const [files, setFiles] = useState([]);
   const [submittedImage, setSubmittedImage] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchPatients();
@@ -28,10 +29,21 @@ const PatientActivity = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/patients/patients');
-      setPatients(response.data); 
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return;
+      }
+
+      const response = await axios.get('http://localhost:3000/patients/patients', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setPatients(response.data);
     } catch (error) {
       console.error('Error fetching patients:', error);
+      setError('Failed to fetch patients');
     }
   };
 
@@ -39,7 +51,6 @@ const PatientActivity = () => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
-
 
   const handleFileChange = (event) => {
     const selectedFiles = event.target.files;
@@ -62,42 +73,46 @@ const PatientActivity = () => {
     setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
-    if (files.length > 0 && !isSubmitting) {
-      setIsSubmitting(true);  
-      const formDataWithFile = new FormData();
-    
-      files.forEach((file) => {
-        formDataWithFile.append('xray', file);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const formDataToSend = new FormData();
+      Object.keys(formData).forEach(key => {
+        formDataToSend.append(key, formData[key]);
+      });
+      files.forEach(file => {
+        formDataToSend.append('xray', file);
       });
 
-      formDataWithFile.append('name', formData.name);
-      formDataWithFile.append('location', formData.location);
-      formDataWithFile.append('age', formData.age);
-      formDataWithFile.append('gender', formData.gender);
+      const response = await axios.post('http://localhost:3000/patients/addPatient', formDataToSend, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
-      try {
-        const response = await axios.post('http://localhost:3000/patients/addPatient', formDataWithFile, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        console.log('Patient added successfully:', response.data);
-        setSubmittedImage(URL.createObjectURL(files[0]));
-        setFiles([]);
-        setIsModalOpen(false); 
-      } catch (error) {
-        console.error('Error uploading files:', error.response ? error.response.data : error.message);
-        alert('Error uploading files. Please try again!');
-      } finally {
-        setIsSubmitting(false);  
-      }
+      setSubmittedImage(response.data);
+      setIsModalOpen(false);
+      setFormData({ name: '', location: '', age: '', gender: '' });
+      setFiles([]);
+      fetchPatients(); // Refresh the list
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      setError(error.response?.data?.message || 'Failed to add patient');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-   const handlePatientDeletion = (patientId) => {
-    
+  const handlePatientDeletion = (patientId) => {
     setPatients(patients.filter(patient => patient._id !== patientId));
   };
 
@@ -109,7 +124,6 @@ const PatientActivity = () => {
         <div className="bg-white p-6 rounded-lg shadow-md mt-4 mx-6">
           <h3 className="text-4xl font-bold mb-6 text-gray-800">Patient</h3>
 
-       
           <div className="flex flex-row justify-between mb-4">
             <div className="flex items-center -ml-2">
               <input
@@ -236,7 +250,6 @@ const PatientActivity = () => {
                         )}
                       </section>
 
-                  
                       {files.length > 0 && (
                         <button
                           onClick={handleSubmit}
@@ -262,7 +275,6 @@ const PatientActivity = () => {
             </div>
           </div>
 
-       
           <div className="overflow-x-auto mt-6 max-h-[60vh]">
             <table className="table-auto border-collapse w-full">
               <thead className="bg-gray-200 sticky top-0 z-10">

@@ -1,21 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import view from '../../../../images/view.png';
 import Doctorsevaluation from './doctors-evaluation';
 import BAGANETEvaluation from './doctors-baga.netEvaluation';
+import axios from 'axios';
 
-function View({ patient }) { // Now receives a patient prop
+function View({ id }) {
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
+  const [patientData, setPatientData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchPatientData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.get(`http://localhost:3000/patients/patients/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setPatientData(response.data);
+    } catch (error) {
+      console.error('Error fetching patient data:', error);
+      setError(error.response?.data?.message || 'Failed to fetch patient data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openModal = () => {
     setIsModalOpen(true);
     setIsClicked(true);
+    fetchPatientData();
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setIsClicked(false);
+    setPatientData(null);
   };
 
   return (
@@ -50,19 +79,30 @@ function View({ patient }) { // Now receives a patient prop
               </div>
             </div>
 
-            {/* Tab Content */}
-            <div className="py-6">
-              {isDoctorOpen ? (
-                <Doctorsevaluation evaluation={patient?.evaluation} />
+            {/* Content */}
+            <div className="mt-4">
+              {loading ? (
+                <p className="text-center">Loading...</p>
+              ) : error ? (
+                <p className="text-center text-red-500">{error}</p>
               ) : (
-                <BAGANETEvaluation />
+                <>
+                  {isDoctorOpen ? (
+                    <Doctorsevaluation evaluation={patientData?.evaluation} />
+                  ) : (
+                    <BAGANETEvaluation />
+                  )}
+                </>
               )}
             </div>
 
-            {/* Modal Footer */}
-            <div className="flex justify-between items-center mt-4">
-              <button className="px-4 py-2 bg-gray-500 rounded-md hover:bg-gray-600" onClick={closeModal}>
-                Back
+            {/* Close Button */}
+            <div className="mt-4 flex justify-end">
+              <button
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                onClick={closeModal}
+              >
+                Close
               </button>
             </div>
           </div>
