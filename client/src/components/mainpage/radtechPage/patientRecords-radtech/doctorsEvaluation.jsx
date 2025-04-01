@@ -1,18 +1,14 @@
-import React from 'react'
-import xray_result from "../../../../images/xray_picture.png"
+import React from 'react';
 
-export default function DoctorsEvaluation() {
+export default function DoctorsEvaluation({ evaluation }) {
   return (
     <div>
-        <div className='bg-white flex flex-row items-center p-6 rounded-lg '>
-          <div className=' w-1/3  text-start  '>
-              <img src={xray_result} alt="Xray_result" className=''></img>
-          </div>
-          <div className=' w-1/2 text-center text-red-600 '>
-          Not yet evaluated by the doctor
-          </div>
+      <div className="flex flex-col p-6 rounded-lg h-[30vh] bg-white gap-2">
+        <div className='text-2xl font-bold text-black'>Findings:</div>
+       <div className="w-full text-center text-red-600 flex flex-row ">
+          {evaluation ? evaluation : "Not yet evaluated by the doctor"}
         </div>
-      
+      </div>
     </div>
-  )
+  );
 }

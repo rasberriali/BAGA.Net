@@ -28,7 +28,7 @@ const Topcontent = () => {
 
             <button
               className="relative border-2 border-teal-500 text-black  px-6 py-3 rounded-lg"
-              onClick={() => navigate('/hero')}
+              onClick={() => navigate('/models')}
             >
               Discover More
             </button>

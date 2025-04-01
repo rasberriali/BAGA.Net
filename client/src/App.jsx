@@ -17,9 +17,6 @@ import Doctorsdashboard from './components/mainpage/doctorPage/dasboard-doctor/d
 import ContactManagement from './components/mainpage/radtechPage/contactManagement-radtech/contactManagement';
 import DoctorscontactManagement from './components/mainpage/doctorPage/contactManagement-doctor/doctors-contactManagement';
 import DoctorsPatientActivity from './components/mainpage/doctorPage/patientRecord-doctor/doctors-patientActivity';
-// import Haha from "./components/landingpage/haha"
-
-
 
 
 function Home() {

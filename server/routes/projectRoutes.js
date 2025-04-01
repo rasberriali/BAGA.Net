@@ -1,77 +1,142 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const multer = require("multer");
+const jwt = require('jsonwebtoken');
 const UserAuthModel = require("../models/UserAuth");
 const PatientDetailsModel = require("../models/PatientDetails");
-const DoctorsPatientDetails = require("../models/doctorsPatientDetails");
-
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, 
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpg|jpeg|png|gif/;
     const fileType = allowedTypes.test(file.mimetype);
-    
     if (fileType) {
-      cb(null, true); 
+      cb(null, true);
     } else {
       cb(new Error("Only image files are allowed!"), false);
     }
   },
 });
 
-router.post("/login", (req, res) => {
-  const { email, password } = req.body;
+// Login route
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-  UserAuthModel.findOne({ email })
-    .then((user) => {
-      if (user) {
-        if (user.password === password) {
-          const response = { 
-            message: "Success", 
-            username: user.username, 
-            role: user.role 
-          };
+    // Find user
+    const user = await UserAuthModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "No record found" });
+    }
 
-          if (user.role === "doctor") {
-            response.doctorId = user._id;
-          }
+    // Verify password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "The password is incorrect" });
+    }
 
-          res.json(response);
-        } else {
-          res.status(401).json({ message: "The password is incorrect" });
-        }
-      } else {
-        res.status(404).json({ message: "No record found" });
-      }
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+    // Create JWT token
+    const token = jwt.sign(
+      { 
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        username: user.username
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    const response = { 
+      message: "Success", 
+      token,
+      username: user.username, 
+      role: user.role,
+      _id: user._id
+    };
+
+    if (user.role === "doctor") {
+      response.doctorId = user._id;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
+// Signup route
+router.post("/signup", async (req, res) => {
+  try {
+    const { username, lastName, email, password, role } = req.body;
 
-router.post("/signup", (req, res) => {
-  const { username, email, password, role } = req.body;
+    // Check if user already exists
+    const existingUser = await UserAuthModel.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
 
-  UserAuthModel.create({ username, email, password, role })
-    .then((user) => res.status(201).json(user))
-    .catch((err) => res.status(500).json({ error: err.message }));
+    // Create new user
+    const user = new UserAuthModel({
+      username,
+      lastName,
+      email,
+      password,
+      role
+    });
+
+    await user.save();
+
+    // Create JWT token
+    const token = jwt.sign(
+      { 
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        username: user.username
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      message: "User created successfully",
+      token,
+      username: user.username,
+      role: user.role,
+      _id: user._id
+    });
+  } catch (error) {
+    console.error("Signup error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
-router.post("/addPatient", upload.array("xray", 5), (req, res) => {
-  const { name, location, age, gender } = req.body;
-  
-  const xrayBase64 = req.files ? req.files.map(file => file.buffer.toString("base64")) : [];
-
-  PatientDetailsModel.create({ name, location, age, gender, xray: xrayBase64 })
-    .then((patient) => {
-      console.log('Patient saved:', patient);
-      res.status(201).json(patient);
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+// Protected routes
+router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
+  try {
+    const { name, location, age, gender } = req.body;
+    const xrayBase64 = req.files ? req.files.map(file => file.buffer.toString("base64")) : [];
+    
+    const patient = await PatientDetailsModel.create({ 
+      name, 
+      location, 
+      age, 
+      gender, 
+      xray: xrayBase64,
+      createdBy: req.user.id // Add user reference
+    });
+    
+    res.status(201).json(patient);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/patients", (req, res) => {
@@ -80,49 +145,40 @@ router.get("/patients", (req, res) => {
     .catch((err) => res.status(500).json({ error: err.message }));
 });
 
+router.delete("/deletePatient/:id", auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const patient = await PatientDetailsModel.findById(id);
+    
+    if (!patient) {
+      return res.status(404).json({ error: "Patient not found" });
+    }
 
-router.delete("/deletePatient/:id", (req, res) => {
-  const { id } = req.params;
-  console.log("Received patient ID:", id); 
-  
-  PatientDetailsModel.findByIdAndDelete(id)
-    .then((patient) => {
-      if (!patient) {
-        return res.status(404).json({ error: "Patient not found" });
-      }
-      res.status(200).json({ message: "Patient deleted successfully" });
-    })
-    .catch((err) => res.status(500).json({ error: err.message }));
+    // Check if user has permission to delete
+    if (patient.createdBy.toString() !== req.user.id && req.user.role !== 'doctor') {
+      return res.status(403).json({ error: "Not authorized to delete this patient" });
+    }
+
+    await PatientDetailsModel.findByIdAndDelete(id);
+    res.status(200).json({ message: "Patient deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
+// NEW ASSIGNMENT ROUTE: Update the PatientDetails record with doctorId
 router.post('/assign-to-doctor', async (req, res) => {
   try {
     const { patientId, doctorId } = req.body;
-
     if (!mongoose.Types.ObjectId.isValid(patientId) || !mongoose.Types.ObjectId.isValid(doctorId)) {
       return res.status(400).json({ error: "Invalid patientId or doctorId format." });
     }
-
     const patient = await PatientDetailsModel.findById(patientId);
     if (!patient) return res.status(404).json({ error: "Patient not found." });
 
-    const doctor = await UserAuthModel.findById(doctorId);
-    if (!doctor) return res.status(404).json({ error: "Doctor not found." });
-
-    const existingEntry = await DoctorsPatientDetails.findOne({ patientId, doctorId });
-    if (!existingEntry) {
-      await DoctorsPatientDetails.create({
-        patientId,
-        doctorId,
-        patientDetails: {
-          name: patient.name,
-          age: patient.age,
-          gender: patient.gender,
-          location: patient.location,
-          xray: patient.xray || [],
-        },
-      });
-    }
+    // Update patient record by assigning the doctor
+    patient.doctorId = doctorId;
+    await patient.save();
 
     res.status(200).json({ message: "Patient assigned successfully." });
   } catch (err) {
@@ -131,17 +187,14 @@ router.post('/assign-to-doctor', async (req, res) => {
   }
 });
 
+// NEW FETCH ASSIGNED PATIENTS: Query PatientDetails by doctorId
 router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
   try {
     const { doctorId } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(doctorId)) {
       return res.status(400).json({ error: "Invalid doctorId" });
     }
-
-    const assignedPatients = await DoctorsPatientDetails.find({ doctorId })
-      .populate("patientId"); 
-
+    const assignedPatients = await PatientDetailsModel.find({ doctorId });
     res.status(200).json(assignedPatients);
   } catch (error) {
     console.error("Error fetching assigned patients:", error);
@@ -149,25 +202,60 @@ router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
   }
 });
 
-
-router.get('/doctors-patients/:doctorId', async (req, res) => {
+// NEW Update Evaluation route: Update evaluation in PatientDetails
+router.put('/updateEvaluation/:id', async (req, res) => {
   try {
-    const { doctorId } = req.params;
-    
-    const patients = await DoctorsPatientDetails.find({ doctorId });
-    
-    res.status(200).json(patients);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const { evaluation } = req.body;
+    const updatedPatient = await PatientDetailsModel.findByIdAndUpdate(
+      req.params.id,
+      { evaluation },
+      { new: true }
+    );
+    if (!updatedPatient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    res.status(200).json({ message: 'Evaluation updated successfully', patient: updatedPatient });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
-router.get("/doctors", async (req, res) => {
+// Protected dashboard routes
+router.get("/dashboard-counts", auth, async (req, res) => {
   try {
-    const doctors = await UserAuthModel.find({ role: "doctor" }).select("username _id");
+    const totalDoctors = await UserAuthModel.countDocuments({ role: "doctor" });
+    const totalRadtechs = await UserAuthModel.countDocuments({ role: "radtech" });
+    const totalPatients = await PatientDetailsModel.countDocuments();
+
+    res.json({ totalDoctors, totalRadtechs, totalPatients });
+  } catch (error) {
+    console.error("Error fetching dashboard counts:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.get("/doctors", auth, async (req, res) => {
+  try {
+    const doctors = await UserAuthModel.find({ role: "doctor" })
+      .select("username _id")
+      .lean();
     res.status(200).json(doctors);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get a single patient by ID
+router.get("/patients/:id", auth, async (req, res) => {
+  try {
+    const patient = await PatientDetailsModel.findById(req.params.id);
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+    res.json(patient);
+  } catch (error) {
+    console.error("Error fetching patient:", error);
+    res.status(500).json({ message: "Error fetching patient data" });
   }
 });
 

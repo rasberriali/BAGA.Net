@@ -9,10 +9,10 @@ const data = [
 
 const Charts = () => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ">
       <div className="bg-white p-6 rounded shadow-md">
         <h3 className="text-lg font-semibold mb-4">Patients Over Time</h3>
-        <LineChart width={400} height={300} data={data}>
+        <LineChart width={400} height={200} data={data}>
           <XAxis dataKey="name" />
           <YAxis />
           <CartesianGrid stroke="#e0dfdf" />
@@ -24,7 +24,7 @@ const Charts = () => {
 
       <div className="bg-white p-6 rounded shadow-md">
         <h3 className="text-lg font-semibold mb-4">Reports Generated</h3>
-        <BarChart width={400} height={300} data={data}>
+        <BarChart width={400} height={200} data={data}>
           <XAxis dataKey="name" />
           <YAxis />
           <CartesianGrid stroke="#e0dfdf" />

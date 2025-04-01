@@ -12,11 +12,20 @@ function Update({ patientId }) {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/doctors");
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const response = await axios.get("http://localhost:3000/doctors", {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         setDoctors(response.data);
       } catch (error) {
         console.error("Error fetching doctors:", error);
-        setError("Failed to load doctors");
+        setError(error.response?.data?.message || "Failed to load doctors");
       }
     };
     fetchDoctors();
@@ -26,15 +35,25 @@ function Update({ patientId }) {
     if (!patientId || !selectedDoctor) return alert("Please select both patient and doctor.");
     console.log("Assigning patient with:", { patientId, doctorId: selectedDoctor });
 
-
     try {
-      // Post to assign the patient to the selected doctor
-      await axios.post("http://localhost:3000/assign-to-doctor", { patientId, doctorId: selectedDoctor });
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      await axios.post("http://localhost:3000/patients/assign-to-doctor", 
+        { patientId, doctorId: selectedDoctor },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       alert("Patient assigned successfully!");
       closeModal();
     } catch (error) {
       console.error("Failed to assign patient:", error);
-      alert("Failed to assign patient.");
+      alert(error.response?.data?.message || "Failed to assign patient.");
     }
   };
 
@@ -75,7 +94,7 @@ function Update({ patientId }) {
               </option>
               {doctors.map((doctor) => (
                 <option key={doctor._id} value={doctor._id}>
-                  Dr. {doctor.username || doctor.name}
+                  Dr. {doctor.username} {doctor.lastName}
                 </option>
               ))}
             </select>

@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import DoctorsNavbar from "../dasboard-doctor/doctors-navbar";
 import DoctorsSidebar from "../dasboard-doctor/doctors-sidebar";
-import View from "../patientRecord-doctor/doctors-view"
-import Update from "../patientRecord-doctor/doctors-update"
+import View from "../patientRecord-doctor/doctors-view";
+import Update from "../patientRecord-doctor/doctors-update";
 
 const DoctorsPatientActivity = () => {
   const [patients, setPatients] = useState([]);
@@ -23,20 +23,30 @@ const DoctorsPatientActivity = () => {
     }
 
     try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await axios.get(
-        `http://localhost:3000/patients/assign-to-doctor/${doctorId}`
+        `http://localhost:3000/patients/patients/assign-to-doctor/${doctorId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
       console.log("API Response:", response);
 
       if (Array.isArray(response.data)) {
         setPatients(
-          response.data.map((item) => ({
-            id: item.patientId?._id || "Unknown ID",
-            name: item.patientId?.name || "N/A",
-            location: item.patientId?.location || "Unknown",
-            age: item.patientId?.age || "Unknown",
-            gender: item.patientId?.gender || "Unknown",
-            xray: item.patientId?.xray?.length ? item.patientId.xray : [],
+          response.data.map((patient) => ({
+            id: patient._id || "Unknown ID",
+            name: patient.name || "N/A",
+            location: patient.location || "Unknown",
+            age: patient.age || "Unknown",
+            gender: patient.gender || "Unknown",
+            xray: patient.xray && patient.xray.length ? patient.xray : [],
           }))
         );
       } else {
@@ -45,7 +55,7 @@ const DoctorsPatientActivity = () => {
       }
     } catch (error) {
       console.error("Error fetching assigned patients:", error);
-      setError("Failed to load patient data.");
+      setError(error.response?.data?.message || "Failed to load patient data.");
     } finally {
       setLoading(false);
     }
@@ -83,26 +93,26 @@ const DoctorsPatientActivity = () => {
                 <tbody>
                   {patients.length > 0 ? (
                     patients.map((patient) => (
-                      <tr key={patient.id} className="">
-                        <td className=" border-gray-300 px-4 py-2">{patient.name}</td>
-                        <td className=" border-gray-300 px-4 py-2">{patient.location}</td>
-                        <td className=" border-gray-300 px-4 py-2">{patient.gender}</td>
-                        <td className=" border-gray-300 px-4 py-2">{patient.age}</td>
+                      <tr key={patient.id}>
+                        <td className="border-gray-300 px-4 py-2">{patient.name}</td>
+                        <td className="border-gray-300 px-4 py-2">{patient.location}</td>
+                        <td className="border-gray-300 px-4 py-2">{patient.gender}</td>
+                        <td className="border-gray-300 px-4 py-2">{patient.age}</td>
                         <td className="border-gray-300 px-4 py-2">
-                        {patient.xray && patient.xray.length > 0 ? (
-                          <img
-                            src={patient.xray[0]} 
-                            alt="X-ray"
-                            className="w-40 h-40 object-cover rounded-md"
-                          />
-                        ) : (
-                          "No X-ray"
-                        )}
-                      </td>                      
-                      <td className="px-6 py-2 flex space-x-2">
-                      <Update patientId={patient._id} />
-                      <View id={patient.id} />
-                    </td>
+                          {patient.xray && patient.xray.length > 0 ? (
+                            <img
+                              src={`data:image/jpeg;base64,${patient.xray[0]}`}
+                              alt="X-ray"
+                              className="w-40 h-40 object-cover rounded-md"
+                            />
+                          ) : (
+                            "No X-ray"
+                          )}
+                        </td>
+                        <td className="px-6 py-2 flex space-x-2">
+                          <Update patientId={patient.id} xrayImages={patient.xray} />
+                          <View id={patient.id} />
+                        </td>
                       </tr>
                     ))
                   ) : (
