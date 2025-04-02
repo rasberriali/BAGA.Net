@@ -22,6 +22,7 @@ const PatientActivity = () => {
   const [submittedImage, setSubmittedImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     fetchPatients();
@@ -73,10 +74,37 @@ const PatientActivity = () => {
     setFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
   };
 
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.name.trim()) errors.name = 'Name is required';
+    if (!formData.location.trim()) errors.location = 'Location is required';
+    if (!formData.age) errors.age = 'Age is required';
+    if (!formData.gender) errors.gender = 'Gender is required';
+    if (files.length === 0) errors.files = 'At least one X-ray image is required';
+    
+    files.forEach((file, index) => {
+      if (!file.type.startsWith('image/')) {
+        errors[`file${index}`] = 'Only image files are allowed';
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        errors[`file${index}`] = 'File size must be less than 5MB';
+      }
+    });
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+    setValidationErrors({});
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -92,6 +120,15 @@ const PatientActivity = () => {
         formDataToSend.append('xray', file);
       });
 
+      console.log('Submitting form data:', {
+        name: formData.name,
+        location: formData.location,
+        age: formData.age,
+        gender: formData.gender,
+        fileCount: files.length,
+        fileTypes: files.map(f => f.type)
+      });
+
       const response = await axios.post('http://localhost:3000/patients/addPatient', formDataToSend, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,14 +136,21 @@ const PatientActivity = () => {
         }
       });
 
+      console.log('Server response:', response.data);
       setSubmittedImage(response.data);
       setIsModalOpen(false);
       setFormData({ name: '', location: '', age: '', gender: '' });
       setFiles([]);
-      fetchPatients(); // Refresh the list
+      fetchPatients();
     } catch (error) {
       console.error('Error uploading files:', error);
-      setError(error.response?.data?.message || 'Failed to add patient');
+      const errorMessage = error.response?.data?.message || 'Failed to add patient';
+      setError(errorMessage);
+      console.error('Detailed error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -153,8 +197,13 @@ const PatientActivity = () => {
                           name="name"
                           value={formData.name}
                           onChange={handleInputChange}
-                          className="mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none"
+                          className={`mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none ${
+                            validationErrors.name ? 'border-red-500' : ''
+                          }`}
                         />
+                        {validationErrors.name && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+                        )}
                       </div>
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-white">Location</label>
@@ -163,8 +212,13 @@ const PatientActivity = () => {
                           name="location"
                           value={formData.location}
                           onChange={handleInputChange}
-                          className="mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none"
+                          className={`mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none ${
+                            validationErrors.location ? 'border-red-500' : ''
+                          }`}
                         />
+                        {validationErrors.location && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.location}</p>
+                        )}
                       </div>
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-white">Age</label>
@@ -173,8 +227,13 @@ const PatientActivity = () => {
                           name="age"
                           value={formData.age}
                           onChange={handleInputChange}
-                          className="mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none"
+                          className={`mt-1 p-2 w-full border rounded-lg bg-gray-700 border-none ${
+                            validationErrors.age ? 'border-red-500' : ''
+                          }`}
                         />
+                        {validationErrors.age && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.age}</p>
+                        )}
                       </div>
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-white">Gender</label>
@@ -182,13 +241,18 @@ const PatientActivity = () => {
                           name="gender"
                           value={formData.gender}
                           onChange={handleInputChange}
-                          className="mt-1 p-2 w-full border rounded-lg bg-gray-700 text-white border-none"
+                          className={`mt-1 p-2 w-full border rounded-lg bg-gray-700 text-white border-none ${
+                            validationErrors.gender ? 'border-red-500' : ''
+                          }`}
                         >
                           <option value="">Select Gender</option>
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
                           <option value="Other">Other</option>
                         </select>
+                        {validationErrors.gender && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.gender}</p>
+                        )}
                       </div>
 
                       <section className="py-2 w-full h-64">
@@ -203,7 +267,9 @@ const PatientActivity = () => {
                           </div>
                         ) : (
                           <div
-                            className="border-2 border-dashed rounded-lg py-4 text-center flex flex-col items-center justify-center"
+                            className={`border-2 border-dashed rounded-lg py-4 text-center flex flex-col items-center justify-center ${
+                              validationErrors.files ? 'border-red-500' : ''
+                            }`}
                             onDrop={handleDrop}
                             onDragOver={(event) => event.preventDefault()}
                           >
@@ -225,6 +291,9 @@ const PatientActivity = () => {
                             >
                               Browse files
                             </label>
+                            {validationErrors.files && (
+                              <p className="text-red-500 text-sm mt-2">{validationErrors.files}</p>
+                            )}
                           </div>
                         )}
 
@@ -260,7 +329,7 @@ const PatientActivity = () => {
                         </button>
                       )}
 
-                      <div className="flex justify-end space-x-4 mt-4">
+                      <div className="flex justify-end ">
                         <button
                           className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400"
                           onClick={() => setIsModalOpen(false)}
@@ -322,6 +391,12 @@ const PatientActivity = () => {
               </tbody>
             </table>
           </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-500 text-white rounded-md">
+              {error}
+            </div>
+          )}
         </div>
       </div>
     </div>
