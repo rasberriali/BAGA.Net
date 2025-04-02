@@ -51,8 +51,8 @@ function Login() {
         }
       }
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error.response?.data?.message || 'Login failed. Please check your credentials.');
+      // Handle error without exposing sensitive information
+      setError('Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
