@@ -10,6 +10,7 @@ import Delete from './delete';
 import View from './view';
 
 const PatientActivity = () => {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [patients, setPatients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,7 +37,7 @@ const PatientActivity = () => {
         return;
       }
 
-      const response = await axios.get('http://localhost:3000/patients/patients', {
+      const response = await axios.get(`${apiUrl}/patients/patients`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -129,7 +130,7 @@ const PatientActivity = () => {
         fileTypes: files.map(f => f.type)
       });
 
-      const response = await axios.post('http://localhost:3000/patients/addPatient', formDataToSend, {
+      const response = await axios.post(`${apiUrl}/patients/addPatient`, formDataToSend, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'

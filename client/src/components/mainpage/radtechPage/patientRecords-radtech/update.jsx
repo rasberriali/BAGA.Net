@@ -3,6 +3,7 @@ import add2 from '../../../../images/add2.png';
 import axios from 'axios';
 
 function Update({ patientId }) {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [doctors, setDoctors] = useState([]);
   const [error, setError] = useState(null);
@@ -10,6 +11,7 @@ function Update({ patientId }) {
   const [isClicked, setIsClicked] = useState(false);
 
   useEffect(() => {
+    
     const fetchDoctors = async () => {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -17,7 +19,7 @@ function Update({ patientId }) {
           throw new Error('No authentication token found');
         }
 
-        const response = await axios.get("http://localhost:3000/doctors", {
+        const response = await axios.get(`${apiUrl}/doctors`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -41,7 +43,7 @@ function Update({ patientId }) {
         throw new Error('No authentication token found');
       }
 
-      await axios.post("http://localhost:3000/patients/assign-to-doctor", 
+      await axios.post(`${apiUrl}/patients/assign-to-doctor`, 
         { patientId, doctorId: selectedDoctor },
         {
           headers: {

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'; // Added Link for navigati
 import axios from 'axios';
 
 function Signup() {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [username, setUserName] = useState(''); // Separate states for first name and last name
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,7 +40,7 @@ function Signup() {
 
     // Send data to backend
     axios
-      .post('http://localhost:3000/patients/signup', {
+      .post(`${apiUrl}/patients/signup`, {
         username,
         lastName,
         email,
