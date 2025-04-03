@@ -9,6 +9,7 @@ import { FaApple } from 'react-icons/fa';
 
 function Login() {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
+  console.log("API URL:", apiUrl);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
