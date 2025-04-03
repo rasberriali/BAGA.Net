@@ -7,6 +7,8 @@ import dashPatient from '../../../../images/dashPatient.png'
 import doctors from '../../../../images/doctors.png';
 
 function Doctorsdashboard() {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
+  
   const [counts, setCounts] = useState({ totalDoctors: 0, totalRadtechs: 0, totalPatients: 0 });
   
   useEffect(() => {
@@ -16,7 +18,7 @@ function Doctorsdashboard() {
       return;
     }
 
-    axios.get("http://localhost:3000/patients/dashboard-counts", {
+    axios.get(`${apiUrl}/patients/dashboard-counts`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

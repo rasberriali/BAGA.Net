@@ -6,6 +6,7 @@ import View from "../patientRecord-doctor/doctors-view";
 import Update from "../patientRecord-doctor/doctors-update";
 
 const DoctorsPatientActivity = () => {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,7 +30,7 @@ const DoctorsPatientActivity = () => {
       }
 
       const response = await axios.get(
-        `http://localhost:3000/patients/patients/assign-to-doctor/${doctorId}`,
+        `${apiUrl}/patients/patients/assign-to-doctor/${doctorId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

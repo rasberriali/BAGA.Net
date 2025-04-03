@@ -3,6 +3,7 @@ import add2 from '../../../../images/add2.png';
 import axios from 'axios';
 
 function Update({ patientId, xrayImages }) {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [description, setDescription] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -24,7 +25,7 @@ function Update({ patientId, xrayImages }) {
     console.log("Selected Patient ID:", patientId);
     try {
       const response = await axios.put(
-        `http://localhost:3000/patients/updateEvaluation/${patientId}`,
+        `${apiUrl}/patients/updateEvaluation/${patientId}`,
         { evaluation: description }
       );
       console.log("Evaluation updated successfully:", response.data);

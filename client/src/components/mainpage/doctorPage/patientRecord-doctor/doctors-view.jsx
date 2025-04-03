@@ -5,6 +5,7 @@ import BAGANETEvaluation from './doctors-baga.netEvaluation';
 import axios from 'axios';
 
 function View({ id }) {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -21,7 +22,7 @@ function View({ id }) {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.get(`http://localhost:3000/patients/patients/${id}`, {
+      const response = await axios.get(`${apiUrl}/patients/patients/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

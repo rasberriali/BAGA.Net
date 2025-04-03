@@ -3,6 +3,7 @@ import del2 from '../../../../images/del2.png';
 import axios from 'axios';
 
 function Delete({ onDelete, patientId }) { 
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -25,7 +26,7 @@ function Delete({ onDelete, patientId }) {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.delete(`http://localhost:3000/patients/deletePatient/${patientId}`, {
+      const response = await axios.delete(`${apiUrl}/patients/deletePatient/${patientId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

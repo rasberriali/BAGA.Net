@@ -8,6 +8,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { FaApple } from 'react-icons/fa';
 
 function Login() {
+  const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -22,7 +23,7 @@ function Login() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:3000/patients/login', { 
+      const response = await axios.post(`${apiUrl}/patients/login`, { 
         email, 
         password 
       });
