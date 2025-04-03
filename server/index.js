@@ -8,16 +8,14 @@ const doctorRoutes = require("./routes/doctorRoutes");
 
 const app = express();
 
-// Trust proxy headers
 app.set('trust proxy', 1);
 
-// Rate limiting configuration
 const limiter = rateLimit({
-  windowMs: 30 * 60 * 1000, // 30 minutes
-  max: 300, // limit each IP to 300 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  skipFailedRequests: true, // Don't count failed requests
+  windowMs: 30 * 60 * 1000, 
+  max: 300, 
+  standardHeaders: true,
+  legacyHeaders: false, 
+  skipFailedRequests: true, 
   keyGenerator: (req) => {
     // Use the real IP address from the request
     return req.ip || req.connection.remoteAddress;
@@ -40,7 +38,7 @@ const authLimiter = rateLimit({
 });
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://baga-net.vercel.app"],
+  origin: ["http://localhost:5173", "https://baga-net.vercel.app","baga-net-backend.vercel.app"],
   methods: ["GET", "POST", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
