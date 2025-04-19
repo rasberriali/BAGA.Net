@@ -27,7 +27,14 @@ function View({ id }) {
           'Authorization': `Bearer ${token}`
         }
       });
-      setPatientData(response.data);
+      
+      if (response.data) {
+        setPatientData({
+          ...response.data,
+          evaluation: response.data.evaluation || '',
+          findings: response.data.findings || ''
+        });
+      }
     } catch (error) {
       console.error('Error fetching patient data:', error);
       setError(error.response?.data?.message || 'Failed to fetch patient data');
@@ -89,7 +96,10 @@ function View({ id }) {
               ) : (
                 <>
                   {isDoctorOpen ? (
-                    <Doctorsevaluation evaluation={patientData?.evaluation} />
+                    <Doctorsevaluation 
+                      evaluation={patientData?.evaluation} 
+                      findings={patientData?.findings}
+                    />
                   ) : (
                     <BAGANETEvaluation />
                   )}

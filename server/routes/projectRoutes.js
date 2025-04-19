@@ -2,13 +2,28 @@ const mongoose = require("mongoose");
 const express = require("express");
 const multer = require("multer");
 const jwt = require('jsonwebtoken');
+const path = require('path');
+const fs = require('fs');
 const UserAuthModel = require("../models/UserAuth");
 const PatientDetailsModel = require("../models/PatientDetails");
 const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-const storage = multer.memoryStorage();
+// Configure multer for file storage
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+
 const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -121,20 +136,48 @@ router.post("/signup", async (req, res) => {
 // Protected routes
 router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
   try {
+    console.log('Request body:', req.body);
+    console.log('Request files:', req.files);
+    console.log('User:', req.user);
+
     const { name, location, age, gender } = req.body;
-    const xrayBase64 = req.files ? req.files.map(file => file.buffer.toString("base64")) : [];
     
-    const patient = await PatientDetailsModel.create({ 
-      name, 
-      location, 
-      age, 
-      gender, 
+    // Convert files to base64
+    const xrayBase64 = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const fileBuffer = fs.readFileSync(file.path);
+        const base64 = fileBuffer.toString('base64');
+        xrayBase64.push(base64);
+        // Clean up the temporary file
+        fs.unlinkSync(file.path);
+      }
+    }
+
+    // Validate required fields
+    if (!name || !location || !age || !gender) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate user
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // Create patient
+    const patient = new PatientDetailsModel({
+      name,
+      location,
+      age: parseInt(age),
+      gender,
       xray: xrayBase64,
-      createdBy: req.user.id // Add user reference
+      createdBy: req.user.id
     });
-    
+
+    await patient.save();
     res.status(201).json(patient);
   } catch (error) {
+    console.error("Error adding patient:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -148,6 +191,11 @@ router.get("/patients", (req, res) => {
 router.delete("/deletePatient/:id", auth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid patient ID format" });
+    }
+
     const patient = await PatientDetailsModel.findById(id);
     
     if (!patient) {
@@ -159,10 +207,18 @@ router.delete("/deletePatient/:id", auth, async (req, res) => {
       return res.status(403).json({ error: "Not authorized to delete this patient" });
     }
 
-    await PatientDetailsModel.findByIdAndDelete(id);
+    const deletedPatient = await PatientDetailsModel.findByIdAndDelete(id);
+    if (!deletedPatient) {
+      return res.status(404).json({ error: "Patient not found or already deleted" });
+    }
+
     res.status(200).json({ message: "Patient deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error in deletePatient route:", error);
+    res.status(500).json({ 
+      error: "Internal server error",
+      details: error.message 
+    });
   }
 });
 
@@ -205,10 +261,10 @@ router.get("/patients/assign-to-doctor/:doctorId", async (req, res) => {
 // NEW Update Evaluation route: Update evaluation in PatientDetails
 router.put('/updateEvaluation/:id', async (req, res) => {
   try {
-    const { evaluation } = req.body;
+    const { evaluation, findings } = req.body;
     const updatedPatient = await PatientDetailsModel.findByIdAndUpdate(
       req.params.id,
-      { evaluation },
+      { evaluation, findings },
       { new: true }
     );
     if (!updatedPatient) {
@@ -256,6 +312,45 @@ router.get("/patients/:id", auth, async (req, res) => {
   } catch (error) {
     console.error("Error fetching patient:", error);
     res.status(500).json({ message: "Error fetching patient data" });
+  }
+});
+
+// Add new route for downloading files
+router.get("/download/:patientId/:classification", auth, async (req, res) => {
+  try {
+    const { patientId, classification } = req.params;
+    
+    // Create classification directory if it doesn't exist
+    const downloadDir = path.join(__dirname, '../downloads', classification);
+    if (!fs.existsSync(downloadDir)) {
+      fs.mkdirSync(downloadDir, { recursive: true });
+    }
+
+    // Get patient data
+    const patient = await PatientDetailsModel.findById(patientId);
+    if (!patient || !patient.xray || patient.xray.length === 0) {
+      return res.status(404).json({ message: "No X-ray images found" });
+    }
+
+    // Save images to the classification directory
+    const savedFiles = [];
+    for (let i = 0; i < patient.xray.length; i++) {
+      const imageBuffer = Buffer.from(patient.xray[i], 'base64');
+      const fileName = `xray_image_${i + 1}.jpg`;
+      const filePath = path.join(downloadDir, fileName);
+      
+      fs.writeFileSync(filePath, imageBuffer);
+      savedFiles.push(filePath);
+    }
+
+    res.json({ 
+      message: "Files saved successfully",
+      files: savedFiles,
+      downloadPath: downloadDir
+    });
+  } catch (error) {
+    console.error("Download error:", error);
+    res.status(500).json({ message: "Error saving files" });
   }
 });
 

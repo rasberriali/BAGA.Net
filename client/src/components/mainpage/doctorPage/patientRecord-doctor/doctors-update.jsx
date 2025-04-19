@@ -4,7 +4,8 @@ import axios from 'axios';
 
 function Update({ patientId, xrayImages }) {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
-  const [description, setDescription] = useState('');
+  const [evaluation, setEvaluation] = useState('');
+  const [findings, setFindings] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
   const [isEnlarged, setIsEnlarged] = useState(false);
@@ -26,7 +27,7 @@ function Update({ patientId, xrayImages }) {
     try {
       const response = await axios.put(
         `${apiUrl}/patients/updateEvaluation/${patientId}`,
-        { evaluation: description }
+        { evaluation, findings }
       );
       console.log("Evaluation updated successfully:", response.data);
       
@@ -112,10 +113,20 @@ function Update({ patientId, xrayImages }) {
             <div className="mb-4 flex flex-row justify-center">
               <textarea
                 className="w-3/5 p-3 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-lime-500"
-                placeholder="Type evaluation..."
+                placeholder="Type impression..."
+                rows="1"
+                value={evaluation}
+                onChange={(e) => setEvaluation(e.target.value)}
+              ></textarea>
+            </div>
+
+            <div className="mb-4 flex flex-row justify-center">
+              <textarea
+                className="w-3/5 p-3 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-lime-500"
+                placeholder="Type findings..."
                 rows="4"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={findings}
+                onChange={(e) => setFindings(e.target.value)}
               ></textarea>
             </div>
             
