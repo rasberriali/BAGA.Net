@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "express-rate-limit": "^7.5.0"
-  }
-}

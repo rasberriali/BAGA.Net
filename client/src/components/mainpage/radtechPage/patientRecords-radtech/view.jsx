@@ -53,7 +53,11 @@ function View({ patient }) { // Now receives a patient prop
             {/* Tab Content */}
             <div className="py-6">
               {isDoctorOpen ? (
-                <DoctorsEvaluation evaluation={patient?.evaluation} />
+                <DoctorsEvaluation 
+                  evaluation={patient?.evaluation} 
+                  findings={patient?.findings}
+                  xrayImages={patient?.xray} 
+                />
               ) : (
                 <BAGANETEvaluation />
               )}

@@ -21,14 +21,29 @@ function Delete({ onDelete, patientId }) {
 
   const handleDelete = async () => {
     try {
-      const response = await axios.delete(`${apiUrl}/patients/deletePatient/${patientId}`);
-      console.log(response.data.message); 
-      setIsDeleted(true);
-      closeModal();
-      onDelete(); 
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.delete(`${apiUrl}/patients/deletePatient/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.status === 200) {
+        console.log(response.data.message); 
+        setIsDeleted(true);
+        closeModal();
+        onDelete();
+      }
     } catch (error) {
-      setErrorMessage("Failed to delete patient!");
       console.error("Error deleting patient:", error);
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.details || 
+                          "Failed to delete patient. Please try again.";
+      setErrorMessage(errorMessage);
     }
   };
 
