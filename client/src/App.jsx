@@ -17,6 +17,7 @@ import Doctorsdashboard from './components/mainpage/doctorPage/dasboard-doctor/d
 import ContactManagement from './components/mainpage/radtechPage/contactManagement-radtech/contactManagement';
 import DoctorscontactManagement from './components/mainpage/doctorPage/contactManagement-doctor/doctors-contactManagement';
 import DoctorsPatientActivity from './components/mainpage/doctorPage/patientRecord-doctor/doctors-patientActivity';
+import Metrics from './components/adminPanel/metrics';
 
 
 function Home() {
@@ -48,7 +49,7 @@ function App() {
         <Route path="/patientActivity" element={<PatientActivity/>}/>
         <Route path="/contactManagement" element={<ContactManagement/>}/>
         <Route path="/doctors-contactManagement" element={<DoctorscontactManagement/>}/>
-       
+        <Route path="/metrics" element={<Metrics/>}/>
         
         
       </Routes>

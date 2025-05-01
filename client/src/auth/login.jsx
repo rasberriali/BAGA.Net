@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { FaEye, FaEyeSlash, FaSpinner } from 'react-icons/fa';
 import { AiOutlineMail } from 'react-icons/ai';
@@ -139,7 +139,12 @@ function Login() {
           {/* Additional Options */}
           <div className="flex flex-col mt-4 justify-center items-center">
             <div className="flex flex-row mt-4 justify-center">
-              <div>Don't have an account? <span className="text-blue-600 cursor-pointer">Sign Up</span></div>
+            <div>
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-blue-600 hover:underline">
+                Sign Up
+              </Link>
+            </div>
             </div>
           </div>
         </form>
