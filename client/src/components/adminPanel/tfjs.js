@@ -82,7 +82,7 @@ export const fetchTfjsModel = async (progressCallback = () => {}) => {
     progressCallback(0);
     console.log("Fetching TensorFlow.js model from server...");
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}/api/tfjs/training_model`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/tfjs/training_model`, {
       method: 'GET',
       headers: {
         'X-API-Key': API_CONFIG.API_KEY,
@@ -266,104 +266,261 @@ export const prepareData = async (images, progressCallback = () => {}) => {
  * @param {Object} preparedData - Data prepared by prepareData function
  * @param {Function} progressCallback - Callback for progress updates
  * @param {Function} epochCallback - Callback for epoch completion
+ * @param {Boolean} submitToServer - Whether to automatically submit the model to the server
  * @returns {Object} - Training results and metrics
  */
-export const trainModel = async (preparedData, progressCallback = () => {}, epochCallback = () => {}) => {
-  try {
-    if (!isBrowser) {
-      throw new Error("This function requires a browser environment");
-    }
-
-    if (!preparedData || !preparedData.train || preparedData.train.length === 0) {
-      throw new Error("Invalid prepared data for training");
-    }
-    
-    // Add detailed logging
-    console.log("Training data:", {
-      trainSize: preparedData.train?.length || 0,
-      validationSize: preparedData.validation?.length || 0,
-      testSize: preparedData.test?.length || 0,
-      classes: preparedData.classes
-    });
-    
-    progressCallback(0);
-    
-    console.log("Starting model training process with TensorFlow.js...");
-    
-    // Number of classes
-    const numClasses = preparedData.classes.length;
-    
-    // Import TensorFlow.js
-    const tf = await import('@tensorflow/tfjs');
-    
-    // Fetch the TensorFlow.js model from the server
-    const modelData = await fetchTfjsModel((progress) => {
-      // Map model fetching progress to 0-20% of overall progress
-      progressCallback(progress * 0.2);
-    });
-    
-    console.log("TensorFlow.js model fetched successfully");
-    progressCallback(0.2);
-    
-    // Get the model and training parameters
-    const model = modelData.model;
-    const trainingParams = modelData.trainingParams;
-    
-    // Convert prepared data to TensorFlow.js tensors
-    console.log("Converting data to TensorFlow.js tensors...");
-    
-    // Create TensorFlow.js datasets from our prepared data
-    const { trainDataset, valDataset, testDataset } = await createTensorflowDatasets(
-      preparedData.train,
-      preparedData.validation,
-      preparedData.test,
-      numClasses,
-      trainingParams.batch_size
-    );
-    
-    progressCallback(0.3);
-    
-    // Compile the model
-    model.compile({
-      optimizer: tf.train.adam(trainingParams.learning_rate),
-      loss: 'categoricalCrossentropy',
-      metrics: ['accuracy']
-    });
-    
-    // Check if we have enough data for training
-    if (preparedData.train.length < trainingParams.min_local_samples || preparedData.validation.length < 2) {
-      console.warn("Not enough data for proper training. Using simulated training results.");
+export const trainModel = async (
+    preparedData, 
+    progressCallback = () => {}, 
+    epochCallback = () => {},
+    submitToServer = false
+  ) => {
+    try {
+      if (!isBrowser) {
+        throw new Error("This function requires a browser environment");
+      }
+  
+      if (!preparedData || !preparedData.train || preparedData.train.length === 0) {
+        throw new Error("Invalid prepared data for training");
+      }
       
-      // Simulate training if not enough data
-      for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
-        // Simulate training progress
-        const simulatedMetrics = {
-          epoch: epoch + 1,
-          trainLoss: 1.0 - (epoch * 0.1),
-          loss: 1.0 - (epoch * 0.1),
-          trainAccuracy: 0.5 + (epoch * 0.05),
-          accuracy: 0.5 + (epoch * 0.05),
-          valLoss: 1.1 - (epoch * 0.1),
-          valAccuracy: 0.45 + (epoch * 0.05)
+      // Add detailed logging
+      console.log("Training data:", {
+        trainSize: preparedData.train?.length || 0,
+        validationSize: preparedData.validation?.length || 0,
+        testSize: preparedData.test?.length || 0,
+        classes: preparedData.classes
+      });
+      
+      progressCallback(0);
+      
+      console.log("Starting model training process with TensorFlow.js...");
+      
+      // Number of classes
+      const numClasses = preparedData.classes.length;
+      
+      // Import TensorFlow.js
+      const tf = await import('@tensorflow/tfjs');
+      
+      // Fetch the TensorFlow.js model from the server
+      const modelData = await fetchTfjsModel((progress) => {
+        // Map model fetching progress to 0-20% of overall progress
+        progressCallback(progress * 0.2);
+      });
+      
+      console.log("TensorFlow.js model fetched successfully");
+      progressCallback(0.2);
+      
+      // Get the model and training parameters
+      const model = modelData.model;
+      const trainingParams = modelData.trainingParams;
+      
+      // Convert prepared data to TensorFlow.js tensors
+      console.log("Converting data to TensorFlow.js tensors...");
+      
+      // Create TensorFlow.js datasets from our prepared data
+      const { trainDataset, valDataset, testDataset } = await createTensorflowDatasets(
+        preparedData.train,
+        preparedData.validation,
+        preparedData.test,
+        numClasses,
+        trainingParams.batch_size
+      );
+      
+      progressCallback(0.3);
+      
+      // Compile the model
+      model.compile({
+        optimizer: tf.train.adam(trainingParams.learning_rate),
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy']
+      });
+      
+      // Check if we have enough data for training
+      if (preparedData.train.length < trainingParams.min_local_samples || preparedData.validation.length < 2) {
+        console.warn("Not enough data for proper training. Using simulated training results.");
+        
+        // Simulate training if not enough data
+        for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
+          // Simulate training progress
+          const simulatedMetrics = {
+            epoch: epoch + 1,
+            trainLoss: 1.0 - (epoch * 0.1),
+            loss: 1.0 - (epoch * 0.1),
+            trainAccuracy: 0.5 + (epoch * 0.05),
+            accuracy: 0.5 + (epoch * 0.05),
+            valLoss: 1.1 - (epoch * 0.1),
+            valAccuracy: 0.45 + (epoch * 0.05)
+          };
+          
+          // Report progress
+          progressCallback(0.3 + ((epoch + 1) / trainingParams.epochs) * 0.5);
+          
+          // Report epoch results
+          epochCallback(simulatedMetrics);
+          
+          // Simulate some training time
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Calculate simulated final metrics
+        const finalMetrics = {
+          accuracy: 0.75,
+          loss: 0.5,
+          precision: 0.73,
+          recall: 0.71,
+          f1Score: 0.72
         };
+        
+        progressCallback(0.9);
+        
+        // Mark images as used in IndexedDB
+        if (preparedData.imageIds && preparedData.imageIds.length > 0) {
+          try {
+            await markImagesAsUsed(preparedData.imageIds);
+            console.log(`Successfully marked ${preparedData.imageIds.length} images as used`);
+          } catch (error) {
+            console.error("Error marking images as used:", error);
+          }
+        }
+        
+        // Generate a version string
+        const modelVersion = `${Date.now().toString()}-v1`;
+        
+        // Create the training results
+        const trainingResults = {
+          model: model,
+          modelData: await model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts)),
+          accuracy: Number(finalMetrics.accuracy).toFixed(4),
+          loss: Number(finalMetrics.loss).toFixed(4),
+          precision: Number(finalMetrics.precision).toFixed(4),
+          recall: Number(finalMetrics.recall).toFixed(4),
+          f1Score: Number(finalMetrics.f1Score).toFixed(4),
+          version: modelVersion,
+          classDistribution: preparedData.distribution,
+          trainSize: preparedData.train.length,
+          valSize: preparedData.validation.length,
+          testSize: preparedData.test.length,
+          usedImageIds: preparedData.imageIds || [],
+          timestamp: new Date().toISOString()
+        };
+        
+        // Submit trained model to server if requested
+        if (submitToServer) {
+            progressCallback(0.95);
+            try {
+              // Collect system metrics
+              const systemMetrics = {
+                browser: navigator.userAgent,
+                platform: navigator.platform,
+                memoryInfo: window.performance?.memory ? {
+                  usedJSHeapSize: window.performance.memory.usedJSHeapSize,
+                  totalJSHeapSize: window.performance.memory.totalJSHeapSize
+                } : null,
+                trainingTime: 500 * trainingParams.epochs, // Simulated time in ms
+                simulatedTraining: true
+              };
+              
+              // Use the function defined in this file - no import needed
+              const submitResult = await submitTrainedModel(trainingResults, systemMetrics);
+              console.log("Model submission result:", submitResult);
+              
+              // Add submission result to training results
+              trainingResults.submitted = true;
+              trainingResults.submissionResult = submitResult;
+            } catch (error) {
+              console.error("Error submitting trained model:", error);
+              trainingResults.submitted = false;
+              trainingResults.submissionError = error.message;
+            }
+          }
+        
+        progressCallback(1);
+        return trainingResults;
+      }
+      
+      // Perform actual training with TensorFlow.js
+      let bestAccuracy = 0;
+      let finalMetrics = {
+        accuracy: 0,
+        loss: 0,
+        precision: 0,
+        recall: 0,
+        f1Score: 0
+      };
+      
+      // For measuring training time
+      const trainingStartTime = performance.now();
+      
+      // Train the model
+      for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
+        console.log(`Training epoch ${epoch + 1}/${trainingParams.epochs}`);
+        
+        // Train for one epoch
+        const trainResult = await model.fitDataset(trainDataset, {
+          epochs: 1,
+          validationData: valDataset,
+          callbacks: {
+            onBatchEnd: (batch, logs) => {
+              console.log(`Batch ${batch}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.acc.toFixed(4)}`);
+            }
+          }
+        });
+        
+        // Extract metrics from training result
+        const trainLoss = trainResult.history.loss[0];
+        const trainAccuracy = trainResult.history.acc[0];
+        const valLoss = trainResult.history.val_loss ? trainResult.history.val_loss[0] : null;
+        const valAccuracy = trainResult.history.val_acc ? trainResult.history.val_acc[0] : null;
+        
+        // Create metrics object for callback
+        const epochMetrics = {
+          epoch: epoch + 1,
+          trainLoss,
+          loss: trainLoss, // Add both names for compatibility
+          trainAccuracy,
+          accuracy: trainAccuracy, // Add both names for compatibility
+          valLoss: valLoss !== null ? valLoss : trainLoss * 1.1,
+          valAccuracy: valAccuracy !== null ? valAccuracy : trainAccuracy * 0.95
+        };
+        
+        // Keep track of best accuracy
+        if (valAccuracy !== null && valAccuracy > bestAccuracy) {
+          bestAccuracy = valAccuracy;
+        }
         
         // Report progress
         progressCallback(0.3 + ((epoch + 1) / trainingParams.epochs) * 0.5);
         
         // Report epoch results
-        epochCallback(simulatedMetrics);
-        
-        // Simulate some training time
-        await new Promise(resolve => setTimeout(resolve, 500));
+        epochCallback(epochMetrics);
       }
       
-      // Calculate simulated final metrics
-      const finalMetrics = {
-        accuracy: 0.75,
-        loss: 0.5,
-        precision: 0.73,
-        recall: 0.71,
-        f1Score: 0.72
+      // Calculate training time
+      const trainingEndTime = performance.now();
+      const trainingTimeMs = trainingEndTime - trainingStartTime;
+      
+      // Evaluate on test set for final metrics
+      let testResults = { loss: 0, acc: 0 };
+      
+      if (testDataset) {
+        console.log(`Evaluating test data: ${preparedData.test.length} samples`);
+        testResults = await model.evaluateDataset(testDataset);
+      }
+      
+      // Extract metrics
+      const testLoss = Array.isArray(testResults) ? testResults[0].dataSync()[0] : testResults.loss;
+      const testAccuracy = Array.isArray(testResults) ? testResults[1].dataSync()[0] : testResults.acc;
+      
+      // Calculate confusion matrix and other metrics
+      const confusionMatrix = await calculateConfusionMatrix(model, preparedData.test, numClasses);
+      const additionalMetrics = calculateAdditionalMetrics(confusionMatrix);
+      
+      // Update final metrics
+      finalMetrics = {
+        accuracy: testAccuracy,
+        loss: testLoss,
+        ...additionalMetrics
       };
       
       progressCallback(0.9);
@@ -378,13 +535,11 @@ export const trainModel = async (preparedData, progressCallback = () => {}, epoc
         }
       }
       
-      progressCallback(1);
-      
       // Generate a version string
       const modelVersion = `${Date.now().toString()}-v1`;
       
-      // Return the trained model and metrics
-      return {
+      // Create the training results
+      const trainingResults = {
         model: model,
         modelData: await model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts)),
         accuracy: Number(finalMetrics.accuracy).toFixed(4),
@@ -400,124 +555,45 @@ export const trainModel = async (preparedData, progressCallback = () => {}, epoc
         usedImageIds: preparedData.imageIds || [],
         timestamp: new Date().toISOString()
       };
-    }
-    
-    // Perform actual training with TensorFlow.js
-    let bestAccuracy = 0;
-    let finalMetrics = {
-      accuracy: 0,
-      loss: 0,
-      precision: 0,
-      recall: 0,
-      f1Score: 0
-    };
-    
-    // Train the model
-    for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
-      console.log(`Training epoch ${epoch + 1}/${trainingParams.epochs}`);
       
-      // Train for one epoch
-      const trainResult = await model.fitDataset(trainDataset, {
-        epochs: 1,
-        validationData: valDataset,
-        callbacks: {
-          onBatchEnd: (batch, logs) => {
-            console.log(`Batch ${batch}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.acc.toFixed(4)}`);
-          }
+      // Submit trained model to server if requested
+      if (submitToServer) {
+        progressCallback(0.95);
+        try {
+          // Collect system metrics
+          const systemMetrics = {
+            browser: navigator.userAgent,
+            platform: navigator.platform,
+            memoryInfo: window.performance?.memory ? {
+              usedJSHeapSize: window.performance.memory.usedJSHeapSize,
+              totalJSHeapSize: window.performance.memory.totalJSHeapSize
+            } : null,
+            trainingTime: trainingTimeMs,
+            epochs: trainingParams.epochs,
+            batchSize: trainingParams.batch_size
+          };
+          
+          // Use the function defined in this file - no import needed
+          const submitResult = await submitTrainedModel(trainingResults, systemMetrics);
+          console.log("Model submission result:", submitResult);
+          
+          // Add submission result to training results
+          trainingResults.submitted = true;
+          trainingResults.submissionResult = submitResult;
+        } catch (error) {
+          console.error("Error submitting trained model:", error);
+          trainingResults.submitted = false;
+          trainingResults.submissionError = error.message;
         }
-      });
-      
-      // Extract metrics from training result
-      const trainLoss = trainResult.history.loss[0];
-      const trainAccuracy = trainResult.history.acc[0];
-      const valLoss = trainResult.history.val_loss ? trainResult.history.val_loss[0] : null;
-      const valAccuracy = trainResult.history.val_acc ? trainResult.history.val_acc[0] : null;
-      
-      // Create metrics object for callback
-      const epochMetrics = {
-        epoch: epoch + 1,
-        trainLoss,
-        loss: trainLoss, // Add both names for compatibility
-        trainAccuracy,
-        accuracy: trainAccuracy, // Add both names for compatibility
-        valLoss: valLoss !== null ? valLoss : trainLoss * 1.1,
-        valAccuracy: valAccuracy !== null ? valAccuracy : trainAccuracy * 0.95
-      };
-      
-      // Keep track of best accuracy
-      if (valAccuracy !== null && valAccuracy > bestAccuracy) {
-        bestAccuracy = valAccuracy;
       }
       
-      // Report progress
-      progressCallback(0.3 + ((epoch + 1) / trainingParams.epochs) * 0.5);
-      
-      // Report epoch results
-      epochCallback(epochMetrics);
+      progressCallback(1);
+      return trainingResults;
+    } catch (error) {
+      console.error("Error in model training process:", error);
+      throw error;
     }
-    
-    // Evaluate on test set for final metrics
-    let testResults = { loss: 0, acc: 0 };
-    
-    if (testDataset) {
-      console.log(`Evaluating test data: ${preparedData.test.length} samples`);
-      testResults = await model.evaluateDataset(testDataset);
-    }
-    
-    // Extract metrics
-    const testLoss = Array.isArray(testResults) ? testResults[0].dataSync()[0] : testResults.loss;
-    const testAccuracy = Array.isArray(testResults) ? testResults[1].dataSync()[0] : testResults.acc;
-    
-    // Calculate confusion matrix and other metrics
-    const confusionMatrix = await calculateConfusionMatrix(model, preparedData.test, numClasses);
-    const additionalMetrics = calculateAdditionalMetrics(confusionMatrix);
-    
-    // Update final metrics
-    finalMetrics = {
-      accuracy: testAccuracy,
-      loss: testLoss,
-      ...additionalMetrics
-    };
-    
-    progressCallback(0.9);
-    
-    // Mark images as used in IndexedDB
-    if (preparedData.imageIds && preparedData.imageIds.length > 0) {
-      try {
-        await markImagesAsUsed(preparedData.imageIds);
-        console.log(`Successfully marked ${preparedData.imageIds.length} images as used`);
-      } catch (error) {
-        console.error("Error marking images as used:", error);
-      }
-    }
-    
-    progressCallback(1);
-    
-    // Generate a version string
-    const modelVersion = `${Date.now().toString()}-v1`;
-    
-    // Return the trained model and metrics
-    return {
-      model: model,
-      modelData: await model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts)),
-      accuracy: Number(finalMetrics.accuracy).toFixed(4),
-      loss: Number(finalMetrics.loss).toFixed(4),
-      precision: Number(finalMetrics.precision).toFixed(4),
-      recall: Number(finalMetrics.recall).toFixed(4),
-      f1Score: Number(finalMetrics.f1Score).toFixed(4),
-      version: modelVersion,
-      classDistribution: preparedData.distribution,
-      trainSize: preparedData.train.length,
-      valSize: preparedData.validation.length,
-      testSize: preparedData.test.length,
-      usedImageIds: preparedData.imageIds || [],
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error("Error in model training process:", error);
-    throw error;
-  }
-};
+  };
 
 
 // ---- Helper functions ----
@@ -596,56 +672,375 @@ const loadImageToElement = async (imageRecord) => {
 };
 
 /**
- * Process an image for training (resize, normalize)
- * @param {HTMLImageElement} imgElement - Image element
- * @param {string} className - The class label
- * @param {Array} classes - List of all class names
- * @returns {Object} - Processed image data
+ * CLAHE (Contrast Limited Adaptive Histogram Equalization) implementation for JavaScript
+ * @param {Uint8ClampedArray} data - Image data array
+ * @param {number} width - Image width
+ * @param {number} height - Image height
+ * @param {number} clipLimit - Clip limit for histogram equalization (default: 2.0)
+ * @param {Array<number>} tileGridSize - Size of grid for histogram equalization [width, height] (default: [8, 8])
+ * @returns {Uint8ClampedArray} - Enhanced image data
  */
-const processImageForTraining = async (imgElement, className, classes) => {
-  try {
-    if (!isBrowser) {
-      throw new Error("This function requires a browser environment");
+const applyCLAHE = (data, width, height, clipLimit = 2.0, tileGridSize = [8, 8]) => {
+    try {
+      // Convert to Lab color space (simplified conversion for JavaScript)
+      const labData = new Uint8ClampedArray(data.length);
+      const result = new Uint8ClampedArray(data.length);
+      
+      // RGB to Lab conversion (approximate)
+      for (let i = 0; i < data.length; i += 4) {
+        // Get RGB values
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const alpha = data[i + 3];
+        
+        // Convert RGB to XYZ (approximate conversion)
+        let x = r * 0.4124 + g * 0.3576 + b * 0.1805;
+        let y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+        let z = r * 0.0193 + g * 0.1192 + b * 0.9505;
+        
+        // Normalize XYZ
+        x /= 95.047;
+        y /= 100.0;
+        z /= 108.883;
+        
+        // XYZ to Lab (simplified)
+        // Convert XYZ to L*a*b* (approximate)
+        const epsilon = 0.008856;
+        const kappa = 903.3;
+        
+        // Compute f(x), f(y), f(z)
+        const fx = x > epsilon ? Math.cbrt(x) : (kappa * x + 16) / 116;
+        const fy = y > epsilon ? Math.cbrt(y) : (kappa * y + 16) / 116;
+        const fz = z > epsilon ? Math.cbrt(z) : (kappa * z + 16) / 116;
+        
+        // Compute L*, a*, b*
+        const L = y > epsilon ? (116 * Math.cbrt(y) - 16) : (kappa * y);
+        const a = 500 * (fx - fy);
+        const b_value = 200 * (fy - fz);
+        
+        // Store Lab values (scaled for 8-bit representation)
+        labData[i] = Math.max(0, Math.min(255, L * 2.55)); // L: 0-100 scaled to 0-255
+        labData[i + 1] = Math.max(0, Math.min(255, a + 128)); // a: -128 to 127 shifted to 0-255
+        labData[i + 2] = Math.max(0, Math.min(255, b_value + 128)); // b: -128 to 127 shifted to 0-255
+        labData[i + 3] = alpha;
+      }
+      
+      // Apply CLAHE to L channel
+      const lChannel = new Uint8ClampedArray(width * height);
+      for (let i = 0, j = 0; i < labData.length; i += 4, j++) {
+        lChannel[j] = labData[i]; // Extract L channel
+      }
+      
+      // Perform CLAHE on L channel
+      const enhancedL = performCLAHE(lChannel, width, height, clipLimit, tileGridSize);
+      
+      // Merge the enhanced L channel back with original a and b channels
+      for (let i = 0, j = 0; i < labData.length; i += 4, j++) {
+        result[i] = enhancedL[j]; // Enhanced L
+        result[i + 1] = labData[i + 1]; // Original a
+        result[i + 2] = labData[i + 2]; // Original b
+        result[i + 3] = labData[i + 3]; // Original alpha
+      }
+      
+      // Convert Lab back to RGB
+      for (let i = 0; i < result.length; i += 4) {
+        // Get Lab values (scaled back from 8-bit representation)
+        const L = result[i] / 2.55; // L: 0-255 scaled to 0-100
+        const a = result[i + 1] - 128; // a: 0-255 shifted to -128 to 127
+        const b_value = result[i + 2] - 128; // b: 0-255 shifted to -128 to 127
+        const alpha = result[i + 3];
+        
+        // Lab to XYZ (simplified conversion)
+        const fy = (L + 16) / 116;
+        const fx = fy + a / 500;
+        const fz = fy - b_value / 200;
+        
+        const epsilon = 0.008856;
+        const kappa = 903.3;
+        
+        // Compute x, y, z
+        const y = L > kappa * epsilon ? Math.pow(fy, 3) : L / kappa;
+        const x = Math.pow(fx, 3) > epsilon ? Math.pow(fx, 3) : (116 * fx - 16) / kappa;
+        const z = Math.pow(fz, 3) > epsilon ? Math.pow(fz, 3) : (116 * fz - 16) / kappa;
+        
+        // XYZ to RGB (approximate conversion)
+        const xn = x * 95.047;
+        const yn = y * 100.0;
+        const zn = z * 108.883;
+        
+        // XYZ to RGB matrix transformation (approximate)
+        let r = xn * 3.2406 - yn * 1.5372 - zn * 0.4986;
+        let g = -xn * 0.9689 + yn * 1.8758 + zn * 0.0415;
+        let b = xn * 0.0557 - yn * 0.2040 + zn * 1.0570;
+        
+        // Gamma correction and clipping
+        r = Math.max(0, Math.min(255, Math.round(r > 0.0031308 ? 
+            1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r)));
+        g = Math.max(0, Math.min(255, Math.round(g > 0.0031308 ? 
+            1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g)));
+        b = Math.max(0, Math.min(255, Math.round(b > 0.0031308 ? 
+            1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b)));
+        
+        // Store RGB values
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+        // Alpha channel remains unchanged
+      }
+      
+      return data;
+    } catch (error) {
+      console.error("Error applying CLAHE:", error);
+      return data; // Return original data on error
+    }
+  };
+  
+  /**
+   * Perform CLAHE on a single channel image
+   * @param {Uint8ClampedArray} channel - Single channel image data
+   * @param {number} width - Image width
+   * @param {number} height - Image height
+   * @param {number} clipLimit - Clip limit for histogram equalization
+   * @param {Array<number>} tileGridSize - Size of grid for histogram equalization [width, height]
+   * @returns {Uint8ClampedArray} - Enhanced single channel image
+   */
+  const performCLAHE = (channel, width, height, clipLimit, tileGridSize) => {
+    const [tilesX, tilesY] = tileGridSize;
+    const tileWidth = Math.floor(width / tilesX);
+    const tileHeight = Math.floor(height / tilesY);
+    const result = new Uint8ClampedArray(channel.length);
+    
+    // Create histogram for each tile
+    const histograms = Array(tilesX * tilesY).fill().map(() => Array(256).fill(0));
+    const lookupTables = Array(tilesX * tilesY).fill().map(() => Array(256).fill(0));
+    
+    // Calculate histograms for each tile
+    for (let ty = 0; ty < tilesY; ty++) {
+      for (let tx = 0; tx < tilesX; tx++) {
+        const histogram = histograms[ty * tilesX + tx];
+        
+        // Calculate histogram for this tile
+        for (let y = 0; y < tileHeight; y++) {
+          if (ty * tileHeight + y >= height) continue;
+          
+          for (let x = 0; x < tileWidth; x++) {
+            if (tx * tileWidth + x >= width) continue;
+            
+            const pixelIdx = (ty * tileHeight + y) * width + (tx * tileWidth + x);
+            const pixelValue = channel[pixelIdx];
+            histogram[pixelValue]++;
+          }
+        }
+        
+        // Apply clip limit
+        const tileSize = tileWidth * tileHeight;
+        const clipHistogram = [...histogram];
+        let clippedPixels = 0;
+        
+        if (clipLimit > 0) {
+          const clipThreshold = Math.max(1, Math.floor(clipLimit * tileSize / 256));
+          
+          // Clip histogram and count clipped pixels
+          for (let i = 0; i < 256; i++) {
+            if (clipHistogram[i] > clipThreshold) {
+              clippedPixels += (clipHistogram[i] - clipThreshold);
+              clipHistogram[i] = clipThreshold;
+            }
+          }
+          
+          // Redistribute clipped pixels
+          const redistIncrement = Math.floor(clippedPixels / 256);
+          let residual = clippedPixels - redistIncrement * 256;
+          
+          for (let i = 0; i < 256; i++) {
+            clipHistogram[i] += redistIncrement;
+            
+            // Distribute remainder
+            if (residual > 0) {
+              clipHistogram[i]++;
+              residual--;
+            }
+          }
+        }
+        
+        // Create lookup table for this tile
+        const cdf = new Array(256).fill(0);
+        cdf[0] = clipHistogram[0];
+        
+        for (let i = 1; i < 256; i++) {
+          cdf[i] = cdf[i - 1] + clipHistogram[i];
+        }
+        
+        const cdfMin = cdf.find(v => v > 0) || 0;
+        const cdfMax = cdf[255];
+        const cdfRange = cdfMax - cdfMin;
+        
+        // Create lookup table
+        if (cdfRange > 0) {
+          for (let i = 0; i < 256; i++) {
+            lookupTables[ty * tilesX + tx][i] = Math.round(
+              ((cdf[i] - cdfMin) / cdfRange) * 255
+            );
+          }
+        } else {
+          // If all pixels in the tile have the same value
+          for (let i = 0; i < 256; i++) {
+            lookupTables[ty * tilesX + tx][i] = i;
+          }
+        }
+      }
     }
     
-    // Create a canvas to resize the image
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Set target size for model input (e.g., 224x224 for common models)
-    canvas.width = 224;
-    canvas.height = 224;
-    
-    // Draw the image on the canvas
-    ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
-    
-    // Get image data as array
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Normalize pixel values to [0,1]
-    const normalizedData = new Float32Array(imageData.data.length / 4 * 3); // RGB only, no alpha
-    
-    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
-      // Normalize from [0,255] to [0,1]
-      normalizedData[j] = imageData.data[i] / 255;     // R
-      normalizedData[j+1] = imageData.data[i+1] / 255; // G
-      normalizedData[j+2] = imageData.data[i+2] / 255; // B
+    // Apply interpolated lookup tables to the image
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const pixelIdx = y * width + x;
+        const pixelValue = channel[pixelIdx];
+        
+        // Determine which tiles this pixel is influenced by
+        const tx = Math.min(tilesX - 1, Math.floor(x / tileWidth));
+        const ty = Math.min(tilesY - 1, Math.floor(y / tileHeight));
+        
+        // Get pixel location relative to tile boundaries
+        const xInTile = (x - tx * tileWidth) / tileWidth;
+        const yInTile = (y - ty * tileHeight) / tileHeight;
+        
+        // Calculate interpolation weights
+        const x1 = Math.max(0, tx - 1);
+        const x2 = Math.min(tilesX - 1, tx + 1);
+        const y1 = Math.max(0, ty - 1);
+        const y2 = Math.min(tilesY - 1, ty + 1);
+        
+        // Calculate interpolated value
+        let newValue = 0;
+        let totalWeight = 0;
+        
+        for (let ny = y1; ny <= y2; ny++) {
+          for (let nx = x1; nx <= x2; nx++) {
+            // Calculate distance-based weight
+            const dx = Math.max(0, 1 - Math.abs(x / tileWidth - nx - 0.5) * 2);
+            const dy = Math.max(0, 1 - Math.abs(y / tileHeight - ny - 0.5) * 2);
+            const weight = dx * dy;
+            
+            if (weight > 0) {
+              newValue += lookupTables[ny * tilesX + nx][pixelValue] * weight;
+              totalWeight += weight;
+            }
+          }
+        }
+        
+        // Normalize the result
+        if (totalWeight > 0) {
+          result[pixelIdx] = Math.round(newValue / totalWeight);
+        } else {
+          result[pixelIdx] = pixelValue;
+        }
+      }
     }
     
-    return {
-      data: normalizedData,
-      width: canvas.width,
-      height: canvas.height,
-      channels: 3,
-      class: className,
-      // One-hot encode the class
-      label: classes.indexOf(className)
-    };
-  } catch (error) {
-    console.error("Error processing image:", error);
-    return null;
-  }
-};
+    return result;
+  };
+  
+  /**
+   * Process an image for training (resize, apply CLAHE, normalize)
+   * @param {HTMLImageElement} imgElement - Image element
+   * @param {string} className - The class label
+   * @param {Array} classes - List of all class names
+   * @returns {Object} - Processed image data
+   */
+  const processImageForTraining = async (imgElement, className, classes) => {
+    try {
+      if (!isBrowser) {
+        throw new Error("This function requires a browser environment");
+      }
+      
+      // First canvas to resize the image to 256x256
+      const resizeCanvas = document.createElement('canvas');
+      const resizeCtx = resizeCanvas.getContext('2d');
+      
+      // Set resize canvas size to 256x256 (matching the resize in PyTorch)
+      resizeCanvas.width = 256;
+      resizeCanvas.height = 256;
+      
+      // Draw the image on the resize canvas
+      resizeCtx.drawImage(imgElement, 0, 0, resizeCanvas.width, resizeCanvas.height);
+      
+      // Create a second canvas for center cropping to 224x224
+      const cropCanvas = document.createElement('canvas');
+      const cropCtx = cropCanvas.getContext('2d');
+      
+      // Set crop canvas size to 224x224 (matching CenterCrop in PyTorch)
+      cropCanvas.width = 224;
+      cropCanvas.height = 224;
+      
+      // Calculate crop coordinates (center crop)
+      const cropX = (resizeCanvas.width - cropCanvas.width) / 2;
+      const cropY = (resizeCanvas.height - cropCanvas.height) / 2;
+      
+      // Draw the center-cropped image on the crop canvas
+      cropCtx.drawImage(
+        resizeCanvas, 
+        cropX, cropY, cropCanvas.width, cropCanvas.height,
+        0, 0, cropCanvas.width, cropCanvas.height
+      );
+      
+      // Get image data for CLAHE processing
+      const imageData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+      
+      // Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+      const enhancedData = applyCLAHE(
+        imageData.data, 
+        cropCanvas.width, 
+        cropCanvas.height, 
+        2.0, // clipLimit
+        [8, 8] // tileGridSize
+      );
+      
+      // Put enhanced data back to canvas
+      const enhancedImageData = new ImageData(
+        enhancedData, 
+        cropCanvas.width, 
+        cropCanvas.height
+      );
+      cropCtx.putImageData(enhancedImageData, 0, 0);
+      
+      // Get final image data
+      const finalImageData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+      
+      // Normalize with mean and std similar to PyTorch's transforms.Normalize
+      const normalizedData = new Float32Array(finalImageData.data.length / 4 * 3); // RGB only
+      
+      // ImageNet mean and std values
+      const mean = [0.485, 0.456, 0.406];
+      const std = [0.229, 0.224, 0.225];
+      
+      for (let i = 0, j = 0; i < finalImageData.data.length; i += 4, j += 3) {
+        // First normalize to [0,1]
+        const r = finalImageData.data[i] / 255;
+        const g = finalImageData.data[i+1] / 255;
+        const b = finalImageData.data[i+2] / 255;
+        
+        // Then normalize with mean and std
+        normalizedData[j] = (r - mean[0]) / std[0];
+        normalizedData[j+1] = (g - mean[1]) / std[1];
+        normalizedData[j+2] = (b - mean[2]) / std[2];
+      }
+      
+      return {
+        data: normalizedData,
+        width: cropCanvas.width,
+        height: cropCanvas.height,
+        channels: 3,
+        class: className,
+        // One-hot encode the class
+        label: classes.indexOf(className)
+      };
+    } catch (error) {
+      console.error("Error processing image:", error);
+      return null;
+    }
+  };
 
 /**
  * Shuffles an array in-place
@@ -763,3 +1158,146 @@ const calculateAdditionalMetrics = (confusionMatrix) => {
     f1Score: f1Score
   };
 };
+
+/**
+ * Submits trained model weights and metrics to the server
+ * @param {Object} trainedModel - Trained TensorFlow.js model and related data
+ * @param {Object} systemMetrics - Optional system metrics about the training environment
+ * @returns {Promise<Object>} - Server response data
+ */
+export const submitTrainedModel = async (trainedModel, systemMetrics = {}) => {
+    try {
+      if (!trainedModel || !trainedModel.model) {
+        throw new Error("No trained model provided");
+      }
+      
+      console.log("Preparing to submit trained model to server...");
+  
+      // Extract model artifacts for submission
+      const modelArtifacts = await trainedModel.model.save(
+        tf.io.withSaveHandler(async artifacts => artifacts)
+      );
+      
+      // Format the weights data in the way the server expects
+      const weightsData = {};
+      
+      // Format depends on the TensorFlow.js version and model format
+      if (modelArtifacts.weightData) {
+        // Handle binary weight format (more efficient)
+        // The server expects a JSON structure, so we'll need to convert the binary weights
+        
+        // Create a mapping of weight names to their values
+        const weightSpecs = modelArtifacts.weightSpecs;
+        let offset = 0;
+        
+        // Convert the binary weight data to a structured format
+        for (const spec of weightSpecs) {
+          const key = spec.name;
+          const shape = spec.shape;
+          const size = shape.reduce((a, b) => a * b, 1);
+          const dataType = spec.dtype;
+          
+          // Create a view into the arraybuffer for this weight
+          const typedArray = getTypedArrayForDType(dataType, modelArtifacts.weightData, offset, size);
+          
+          // Convert to regular array for JSON serialization
+          weightsData[key] = Array.from(typedArray);
+          
+          // Move the offset for the next weight
+          offset += size * bytesPerElement(dataType);
+        }
+      } else if (modelArtifacts.weights) {
+        // Handle direct weights object format
+        for (const key in modelArtifacts.weights) {
+          const tensor = modelArtifacts.weights[key];
+          weightsData[key] = Array.from(tensor.dataSync());
+        }
+      } else {
+        throw new Error("Unsupported model artifact format");
+      }
+      
+      // Prepare payload that matches the server's expected format
+      const payload = {
+        weights: weightsData,
+        metrics: {
+          accuracy: parseFloat(trainedModel.accuracy || 0),
+          loss: parseFloat(trainedModel.loss || 0),
+          precision: parseFloat(trainedModel.precision || 0),
+          recall: parseFloat(trainedModel.recall || 0),
+          f1Score: parseFloat(trainedModel.f1Score || 0)
+        },
+        round: 0, // Default to round 0, could be passed as parameter if needed
+        num_samples: trainedModel.trainSize || 0,
+        timestamp: new Date().toISOString(),
+        system_metrics: systemMetrics
+      };
+      
+      console.log("Submitting trained model to server...");
+      
+      // Get JWT and API credentials
+      const JWT = localStorage.getItem('jwtToken');
+      const API_KEY = "FeDMl2025"; // Should be loaded securely
+      const CLIENT_ID = localStorage.getItem('clientId') || `client-${Date.now()}`;
+      
+      // Make the API request
+      const response = await fetch("http://localhost:5050/tfjs/submit_weights", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': API_KEY,
+          'X-Client-ID': CLIENT_ID,
+          'Authorization': `Bearer ${JWT}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Server error: ${error.message || response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log("Model submission successful:", result);
+      
+      return result;
+    } catch (error) {
+      console.error("Error submitting trained model:", error);
+      throw error;
+    }
+  };
+  
+  /**
+   * Helper function to get typed array view based on dtype
+   */
+  function getTypedArrayForDType(dtype, buffer, begin, size) {
+    switch (dtype) {
+      case 'float32':
+        return new Float32Array(buffer, begin, size);
+      case 'int32':
+        return new Int32Array(buffer, begin, size);
+      case 'bool':
+        return new Uint8Array(buffer, begin, size);
+      case 'complex64':
+        // Complex numbers are stored as pairs of float32s
+        return new Float32Array(buffer, begin, size * 2);
+      default:
+        throw new Error(`Unsupported dtype: ${dtype}`);
+    }
+  }
+  
+  /**
+   * Helper function to determine bytes per element for each dtype
+   */
+  function bytesPerElement(dtype) {
+    switch (dtype) {
+      case 'float32':
+      case 'int32':
+        return 4;
+      case 'bool':
+        return 1;
+      case 'complex64':
+        return 8;
+      default:
+        throw new Error(`Unsupported dtype: ${dtype}`);
+    }
+  }

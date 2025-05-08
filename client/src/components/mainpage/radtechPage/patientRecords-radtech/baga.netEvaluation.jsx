@@ -51,7 +51,6 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
 
   const fetchModelEvaluation = async () => {
     if (!patientId) {
-      // No need to fetch if we don't have a patient ID
       setModelEvaluation(null);
       return;
     }
@@ -72,11 +71,21 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
   
       // Check for success and data
       if (response.data && response.data.success && response.data.evaluation) {
+        // Store the entire evaluation object
         setModelEvaluation(response.data.evaluation);
         
-        // If there's classification data available, update the predictedClass state too
+        // If there's a class ID available, update the predictedClass state too
         if (response.data.evaluation.modelevaluation !== undefined) {
-          setPredictedClass(response.data.evaluation.modelevaluation);
+          // Convert to number if it's stored as a string
+          const classId = typeof response.data.evaluation.modelevaluation === 'string' 
+            ? parseInt(response.data.evaluation.modelevaluation, 10) 
+            : response.data.evaluation.modelevaluation;
+            
+          setPredictedClass(classId);
+          
+          // Also update the diagnosis output if needed
+          const description = getClassDescription(classId);
+          setDiagnosisOutput(`Class ID: ${classId}\nDiagnosis: ${description}`);
         }
       } else {
         // Handle the case where the request was successful but no data was found
@@ -381,7 +390,6 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
     setProcessing(true);
   
     try {
-      // ─── your preprocessing + inference ───
       if (!xrayImages || xrayImages.length === 0) {
         setError("No X-ray images available for processing");
         return;
@@ -423,18 +431,18 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       try {
         if (patientId) {
           console.log('Updating classification for patient:', patientId);
-          // Save only class ID and diagnosis
+          // Save both class ID and diagnosis description
           const response = await axios.put(
             `${backendApiUrl}/patients/modelEval/${patientId}`,
             {
-              modelevaluation: idx,
-              evaluation: description
+              modelevaluation: idx,  // Store the numeric class ID
+              evaluation: description // Store the text diagnosis
             },
             { headers: { Authorization: `Bearer ${appToken}` } }
           );
           console.log("✅ Patient classification updated", response.data);
           
-          // Refresh evaluation data
+          // Refresh evaluation data after saving
           fetchModelEvaluation();
         } else {
           console.log('Creating new patient record');
@@ -486,37 +494,46 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
     return classNames[classId] || `Unknown Class (${classId})`;
   };
 
-  // FIXED: Updated renderEvaluationMetrics function to properly display class ID and diagnosis
+  // FIXED: Updated renderEvaluationMetrics function to clearly indicate model evaluation results
   const renderEvaluationMetrics = () => {
     if (loadingEvaluation) {
       return (
         <div className="text-gray-500 text-sm italic">
-          Loading classification data...
+          Loading model evaluation data...
         </div>
       );
     }
-
+  
+    if (errorEvaluation) {
+      return (
+        <div className="text-red-500 text-sm italic">
+          {errorEvaluation}
+        </div>
+      );
+    }
+  
     if (!modelEvaluation) {
       return (
         <div className="text-gray-500 text-sm italic">
-          No classification data available
+          No model evaluation data available
         </div>
       );
     }
-
+  
+    // Display the model's diagnosis results (not the doctor's evaluation)
     return (
       <div className="mt-4 bg-gray-50 p-4 rounded-md">
-        <h3 className="font-medium text-lg mb-2">Classification Result</h3>
+        <h3 className="font-medium text-lg mb-2">AI Model Diagnosis</h3>
         
         <div className="grid grid-cols-1 gap-y-2">
-          {/* Always display Class ID as bolded text */}
+          {/* Display Class ID from modelevaluation field */}
           <div>
             <span className="font-bold">Class ID:</span> {modelEvaluation.modelevaluation}
           </div>
           
-          {/* Always display Diagnosis as bolded text */}
+          {/* Display Diagnosis from evaluation field - this contains the model's diagnosis text */}
           <div>
-            <span className="font-bold">Diagnosis:</span> {modelEvaluation.evaluation}
+            <span className="font-bold">AI Diagnosis:</span> {modelEvaluation.evaluation}
           </div>
         </div>
         
@@ -551,7 +568,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
           {/* Results display */}
           <div className='w-1/2 flex flex-col text-black'>
             <div className='text-2xl font-bold mb-4'>
-              Classification Results
+              AI Model Classification
             </div>
             
             <div className="mb-4 flex items-center">
@@ -571,7 +588,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
             {predictedClass !== null ? (
               <div className='text-lg'>
                 <div className="mb-2"><span className="font-semibold">Class ID:</span> {predictedClass}</div>
-                <div><span className="font-semibold">Diagnosis:</span> {getClassDescription(predictedClass)}</div>
+                <div><span className="font-semibold">AI Diagnosis:</span> {getClassDescription(predictedClass)}</div>
               </div>
             ) : (
               <div className='text-base text-gray-500'>
@@ -599,7 +616,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
           </span>
         </div>
         
-        {/* Model Evaluation Section - Now displays classification results */}
+        {/* Model Evaluation Section - Now explicitly shows AI model diagnosis */}
         {renderEvaluationMetrics()}
         
         {/* Thumbnails for multiple images */}

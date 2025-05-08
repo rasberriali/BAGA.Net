@@ -12,6 +12,7 @@
   "dependencies": {
     "@material-tailwind/react": "^2.1.10",
     "@radix-ui/react-slot": "^1.2.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
     "daisyui": "^5.0.35",

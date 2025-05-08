@@ -489,7 +489,7 @@ router.get('/modelEvaluation/:id', async (req, res) => {
     }
 
     // Check if there's model evaluation data
-    if (!patient.modelevaluation) {
+    if (patient.modelevaluation === undefined) {
       return res.status(200).json({
         success: true,
         message: 'No evaluation data available for this patient',
@@ -497,21 +497,14 @@ router.get('/modelEvaluation/:id', async (req, res) => {
       });
     }
 
-    // Return the evaluation data
-    // You can format or transform this data as needed before sending
+    // Return the evaluation data with actual values from the patient
     const evaluationData = {
-      // Include any evaluation metrics you have stored
-      accuracy: 0.92, // Example value - replace with actual data
-      precision: 0.89,
-      recall: 0.94,
-      f1_score: 0.91,
-      auc: 0.95,
-      specificity: 0.88,
+      // Include any evaluation metrics if you have stored them separately
       last_updated: new Date(),
       
-      // Include the actual classification result
-      classification: patient.modelevaluation,
-      diagnosis: patient.evaluation
+      // Include the actual classification result and evaluation
+      modelevaluation: patient.modelevaluation, // Store the numeric class ID
+      evaluation: patient.evaluation // Store the text diagnosis
     };
 
     return res.status(200).json({
