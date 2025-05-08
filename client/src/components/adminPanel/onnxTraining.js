@@ -1,5 +1,6 @@
-// Utilities for training with image management/purging capabilities and ONNX model integration
+// onnxTraining.js
 
+// Utilities for training with image management/purging capabilities and ONNX model integration
 import { openDatabase, getAllImageIds, markImagesAsUsed, purgeUsedImages, getImagesByTrainingStatus } from '../utils/indexedDBUtils.js';
 
 // Re-export the necessary functions that metrics.jsx is trying to import
@@ -13,10 +14,9 @@ export { getImagesByTrainingStatus };
 export async function manualPurgeUsedImages(progressCallback = () => {}) {
   try {
     progressCallback(0);
-    
+
     // Get all images marked as used
     const usedImages = await getImagesByTrainingStatus('used');
-    
     if (!usedImages || usedImages.length === 0) {
       progressCallback(1);
       return { 
@@ -25,21 +25,15 @@ export async function manualPurgeUsedImages(progressCallback = () => {}) {
         purgedCount: 0 
       };
     }
-    
+
     progressCallback(0.3);
-    
-    // Extract IDs of images to purge
     const imageIds = usedImages.map(img => img.id);
-    
-    // Call the purgeUsedImages function from indexedDBUtils
     const result = await purgeUsedImages();
-    
     progressCallback(0.8);
-    
+
     console.log(`Successfully purged ${result.purgedCount} used images`);
-    
     progressCallback(1);
-    
+
     return {
       success: true,
       message: `Successfully purged ${result.purgedCount} images`,
@@ -64,14 +58,19 @@ const API_CONFIG = {
   BASE_URL: "http://localhost:5050",
   // This should ideally be loaded from environment variables or secure storage
   API_KEY: "FeDMl2025",
-  // Generate a client ID that persists throughout the session
-  CLIENT_ID: isBrowser ? (localStorage.getItem('clientId') || `client-${Date.now()}`) : "default-client"
+  // Generate or load a client ID that persists throughout the session
+  CLIENT_ID: isBrowser
+    ? (localStorage.getItem('clientId') || `client-${Date.now()}`)
+    : "default-client"
 };
 
 // Store client ID if in browser environment
 if (isBrowser && !localStorage.getItem('clientId')) {
   localStorage.setItem('clientId', API_CONFIG.CLIENT_ID);
 }
+
+// Retrieve the JWT you obtained from /api/token
+const JWT = isBrowser ? localStorage.getItem('jwtToken') : null;
 
 /**
  * Fetch the ONNX model from the server
@@ -82,58 +81,50 @@ export const fetchOnnxModel = async (progressCallback = () => {}) => {
   try {
     progressCallback(0);
     console.log("Fetching ONNX model from server...");
-    
+
     const response = await fetch(`${API_CONFIG.BASE_URL}/model`, {
       method: 'GET',
       headers: {
         'X-API-Key': API_CONFIG.API_KEY,
-        'X-Client-ID': API_CONFIG.CLIENT_ID
+        'X-Client-ID': API_CONFIG.CLIENT_ID,
+        'Authorization': `Bearer ${JWT}`
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
     }
-    
-    // Check if we can use ReadableStream and fetch progress
+
+    // If the browser supports streaming, use it to report progress
     if (response.body && typeof response.body.getReader === 'function') {
-      // Get total size if available
       const contentLength = response.headers.get('Content-Length');
       const totalLength = contentLength ? parseInt(contentLength, 10) : 0;
-      
-      // Read the stream
       const reader = response.body.getReader();
       const chunks = [];
       let receivedLength = 0;
-      
+
       while (true) {
         const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
-        
+        if (done) break;
         chunks.push(value);
         receivedLength += value.length;
-        
-        // Report progress if we know the total length
         if (totalLength > 0) {
           progressCallback(receivedLength / totalLength);
         }
       }
-      
-      // Concatenate chunks into a single Uint8Array
+
+      // Concatenate chunks into a single buffer
       const modelData = new Uint8Array(receivedLength);
       let position = 0;
       for (const chunk of chunks) {
         modelData.set(chunk, position);
         position += chunk.length;
       }
-      
+
       progressCallback(1);
       return modelData.buffer;
     } else {
-      // Fallback for browsers that don't support streaming or if streaming fails
+      // Fallback for older browsers: download as a whole
       progressCallback(0.5);
       const modelBuffer = await response.arrayBuffer();
       progressCallback(1);
@@ -155,23 +146,18 @@ export const createOnnxSession = async (modelData) => {
     if (!isBrowser) {
       throw new Error("This function requires a browser environment");
     }
-    
-    // Dynamically import onnxruntime-web
-    // Note: This assumes onnxruntime-web is already installed in your project
     const ort = await import('onnxruntime-web');
-    
-    // Create ONNX inference session
     const session = await ort.InferenceSession.create(modelData, {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all'
     });
-    
     return session;
   } catch (error) {
     console.error("Error creating ONNX session:", error);
     throw new Error(`Failed to create ONNX session: ${error.message}`);
   }
 };
+
 
 /**
  * Prepares image data for training by splitting into train/validation/test sets
