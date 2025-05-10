@@ -42,9 +42,9 @@ const authLimiter = rateLimit({
 });
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://baga-net.vercel.app","https://baga-net-backend.vercel.app", "http://localhost:5050"],
-  methods: ["GET", "POST", "DELETE", "PUT"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  origin: ["http://localhost:5173", "https://baga-net.vercel.app","https://baga-net-backend.vercel.app", "http://localhost:5050", "https://BagaNet.loca.lt"],
+  methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
   credentials: true
 };
 

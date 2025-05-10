@@ -9,6 +9,7 @@ const PatientDetailsSchema = new mongoose.Schema({
   doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
   evaluation: { type: String, required: false },
   modelevaluation: { type: String, required: false },
+  modelDiagnosisText: { type: String, required: false },
   findings: { type: String, required: false },
   classifiedDisease: { type: String, required: false},
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'UserAuth', required: true },

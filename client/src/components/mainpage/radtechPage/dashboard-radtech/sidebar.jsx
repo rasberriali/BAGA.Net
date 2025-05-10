@@ -11,7 +11,6 @@ import contact from '../../../../images/Vector22x.png';
 import tech from '../../../../images/Vector6.png';
 import settings from '../../../../images/Vector5.png';
 import toggle_btn from "../../../../images/toggle_btn.png";
-import metricsIcon from '../../../../images/targeting.png';
 
 const Sidebar = () => {
     const navigate = useNavigate();
@@ -26,7 +25,7 @@ const Sidebar = () => {
         setIsSidebarVisible(!isSidebarVisible);
     };
 
-    const SidebarItem = ({ icon, label, path }) => {
+    const SidebarItem = ({ icon, label, path, className }) => {
         const isActive = location.pathname === path; 
 
         return (
@@ -75,7 +74,7 @@ const Sidebar = () => {
                 <SidebarItem icon={contact} label="Contact Management" path="/contactManagement" />
                 <SidebarItem icon={notif} label="Notifications" path="/notifications" />
                 <SidebarItem icon={message} label="Chat with Doctors" path="/chat-with-doctors" />
-                <SidebarItem icon={metricsIcon} label="Metrics" path="/metrics" />
+                <SidebarItem icon={patient} label="Metrics" path="/metrics" />
             </nav>
 
             <nav className="text-white text-base mt-auto mb-8">

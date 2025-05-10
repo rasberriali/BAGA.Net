@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { InferenceSession, env, Tensor } from 'onnxruntime-web';
 import axios from 'axios';
+import { storeModel, getModel, storeExists, getDatabaseVersion } from '../../../utils/indexedDBUtils';
 
 env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/";
 
 // Auth utilities
 const getAuthToken = async (clientId = "web-client") => {
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:5050";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
   const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
   
   try {
@@ -31,7 +32,7 @@ const getAuthToken = async (clientId = "web-client") => {
 };
 
 export default function BAGANETEvaluation({ patientId, xrayImages }) {
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:5050";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
   const backendApiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
 
@@ -51,6 +52,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
 
   const fetchModelEvaluation = async () => {
     if (!patientId) {
+      // No need to fetch if we don't have a patient ID
       setModelEvaluation(null);
       return;
     }
@@ -71,21 +73,11 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
   
       // Check for success and data
       if (response.data && response.data.success && response.data.evaluation) {
-        // Store the entire evaluation object
         setModelEvaluation(response.data.evaluation);
         
-        // If there's a class ID available, update the predictedClass state too
+        // If there's classification data available, update the predictedClass state too
         if (response.data.evaluation.modelevaluation !== undefined) {
-          // Convert to number if it's stored as a string
-          const classId = typeof response.data.evaluation.modelevaluation === 'string' 
-            ? parseInt(response.data.evaluation.modelevaluation, 10) 
-            : response.data.evaluation.modelevaluation;
-            
-          setPredictedClass(classId);
-          
-          // Also update the diagnosis output if needed
-          const description = getClassDescription(classId);
-          setDiagnosisOutput(`Class ID: ${classId}\nDiagnosis: ${description}`);
+          setPredictedClass(response.data.evaluation.modelevaluation);
         }
       } else {
         // Handle the case where the request was successful but no data was found
@@ -124,7 +116,6 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       }
     };
 
-
     initAuth();
     fetchModelEvaluation();
     
@@ -140,79 +131,99 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
     }
   }, [xrayImages, selectedImage, backendApiUrl]);
 
-  const handleDownloadModel = async () => {
-    setDownloading(true);
-    setError(null);
-    
+  const loadOrDownloadModel = async () => {
     try {
-      // Ensure we have a valid token
-      if (!authToken) {
-        const token = await getAuthToken();
-        setAuthToken(token);
+      // Check if 'models' store exists
+      const hasModelsStore = await storeExists('models', 'xrayImagesDB');
+      
+      // If models store doesn't exist, we'll need to download the model
+      if (!hasModelsStore) {
+        console.log('🏗️ Models store does not exist, downloading model');
+        
+        // Fetch from server
+        console.log('⬇️ Downloading model from server');
+        const response = await fetch(`${modelServerUrl}/model`, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Accept': 'application/octet-stream',
+            'X-API-Key': apiKey,
+            'Authorization': `Bearer ${authToken}`,
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Model download failed: ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+      
+        // Save it in IndexedDB for next time
+        await storeModel(arrayBuffer, 'default', 'xrayImagesDB');
+      
+        // Create session
+        return InferenceSession.create(arrayBuffer, { executionProviders: ['wasm'] });
       }
       
-      const response = await fetch(`${modelServerUrl}/model`, {  
+      // Try to load from IndexedDB
+      const modelBlob = await getModel('onnx_default', 'xrayImagesDB');      
+      if (modelBlob) {
+        console.log('🔁 Loading model from IndexedDB');
+        const arrayBuf = await modelBlob.arrayBuffer();
+        return InferenceSession.create(arrayBuf, { executionProviders: ['wasm'] });
+      }
+    
+      // Fallback: fetch from server if model not in IndexedDB
+      console.log('⬇️ Downloading model from server (fallback)');
+      const response = await fetch(`${modelServerUrl}/model`, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Accept': 'application/octet-stream',
           'X-API-Key': apiKey,
-          'Authorization': `Bearer ${authToken}`
-        },
-        mode: 'cors',
-        credentials: 'omit'
-      });
-  
-      if (!response.ok) {
-        // If unauthorized, try to refresh token
-        if (response.status === 401) {
-          const newToken = await getAuthToken();
-          setAuthToken(newToken);
-          
-          // Retry the request with new token
-          const retryResponse = await fetch(`${modelServerUrl}/model`, {  
-            headers: {
-              'Accept': 'application/octet-stream',
-              'X-API-Key': apiKey,
-              'Authorization': `Bearer ${newToken}`
-            },
-            mode: 'cors',
-            credentials: 'omit'
-          });
-          
-          if (!retryResponse.ok) {
-            throw new Error(`HTTP error! status: ${retryResponse.status}`);
-          }
-          
-          const modelData = await retryResponse.arrayBuffer();
-          const session = await InferenceSession.create(modelData, {
-            executionProviders: ['wasm']
-          });
-          setModel(session);
-          console.log("✅ ONNX model loaded after token refresh");
-          return session;
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          'Authorization': `Bearer ${authToken}`,
         }
-      }
-  
-      const modelData = await response.arrayBuffer();
-      console.log("Model download successful, creating session...", modelData.byteLength);
-  
-      const session = await InferenceSession.create(modelData, {
-        executionProviders: ['wasm']
       });
+      
+      if (!response.ok) {
+        throw new Error(`Model download failed: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+    
+      // Save it in IndexedDB for next time
+      await storeModel(arrayBuffer, 'default', 'xrayImagesDB');
+    
+      // Create session
+      return InferenceSession.create(arrayBuffer, { executionProviders: ['wasm'] });
+    } catch (error) {
+      console.error("Error in loadOrDownloadModel:", error);
+      throw error;
+    }
+  };
   
+  const handleDownloadModel = async () => {
+    setDownloading(true);
+    try {
+      if (!authToken) {
+        const newToken = await getAuthToken();
+        setAuthToken(newToken);
+      }
+      const session = await loadOrDownloadModel();
       setModel(session);
-      console.log("✅ ONNX model loaded");
+      console.log('✅ Model ready');
       return session;
     } catch (err) {
-      console.error("Error loading ONNX model:", err);
-      setError('Failed to load ONNX model: ' + (err.message || 'Unknown error'));
+      console.error(err);
+      setError('Failed to load model: ' + err.message);
       return null;
     } finally {
       setDownloading(false);
     }
   };
-  
+
   const applyCLAHE = (srcMat) => {
     try {
       const labMat = new cv.Mat();
@@ -225,80 +236,103 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       cv.cvtColor(labMat, labMat, cv.COLOR_Lab2RGB);
       labChannels.delete();
       clahe.delete();
+      console.log("✅ CLAHE applied successfully.");
       return labMat;
     } catch (e) {
       console.error("Error in CLAHE processing:", e);
       throw e;
     }
   };
+  
 
   const preprocessImage = async (imageData) => {
     return new Promise((resolve, reject) => {
       try {
         const img = new Image();
         img.crossOrigin = "anonymous";
-        
-        // Handle base64 data properly
+  
         if (typeof imageData === 'string') {
-          // If it's already a complete data URL
-          if (imageData.startsWith('data:')) {
-            img.src = imageData;
-          } else {
-            // If it's just base64 data without the prefix
-            img.src = `data:image/jpeg;base64,${imageData}`;
-          }
+          img.src = imageData.startsWith('data:')
+            ? imageData
+            : `data:image/jpeg;base64,${imageData}`;
         } else {
           reject("Invalid image data format");
           return;
         }
-        
+  
         img.onload = () => {
           try {
-            // Create canvas for preprocessing
+            // Create and prepare canvas
             const canvas = document.createElement('canvas');
             canvas.width = 256;
             canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, 256, 256);
-            
-            // Process with OpenCV
+  
+            // Preserve aspect ratio when drawing image
+            const imgRatio = img.width / img.height;
+            let drawW, drawH;
+            if (imgRatio > 1) {
+              drawW = 256;
+              drawH = Math.round(256 / imgRatio);
+            } else {
+              drawH = 256;
+              drawW = Math.round(256 * imgRatio);
+            }
+  
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, 256, 256); // pad with black
+            ctx.drawImage(img, (256 - drawW) / 2, (256 - drawH) / 2, drawW, drawH);
+  
+            // 🔍 Optional: visualize canvas on page
+            document.body.appendChild(canvas);
+            canvas.style.border = "2px solid red";
+            canvas.style.margin = "10px";
+  
             if (!window.cv) {
               reject("OpenCV.js is not loaded");
               return;
             }
-            
+  
             let src = cv.imread(canvas);
+            cv.cvtColor(src, src, cv.COLOR_BGR2RGB); // OpenCV loads as BGR
+  
+            // Center crop to 224x224
             const x = Math.floor((256 - 224) / 2);
             const y = Math.floor((256 - 224) / 2);
-            const roi = src.roi(new cv.Rect(x, y, 224, 224));
-            const claheImg = applyCLAHE(roi);
-
+            let roi = src.roi(new cv.Rect(x, y, 224, 224));
+  
+            // 🔧 Optional CLAHE (currently disabled)
+            // let processedImg = applyCLAHE(roi);
+            let processedImg = roi;
+  
+            // Normalize using ImageNet mean and std
             const input = new Float32Array(1 * 3 * 224 * 224);
             let i = 0;
             for (let y = 0; y < 224; y++) {
               for (let x = 0; x < 224; x++) {
                 for (let c = 0; c < 3; c++) {
-                  let pixel = claheImg.ucharPtr(y, x)[c] / 255.0;
+                  let pixel = processedImg.ucharPtr(y, x)[c] / 255.0;
                   const mean = [0.485, 0.456, 0.406][c];
                   const std = [0.229, 0.224, 0.225][c];
                   input[i++] = (pixel - mean) / std;
                 }
               }
             }
-
-            src.delete();
-            roi.delete();
-            claheImg.delete();
+  
+            // Clean up
+            src.delete(); if (processedImg !== roi) processedImg.delete(); roi.delete();
+  
             resolve({
               tensor: input,
-              canvas: canvas.toDataURL('image/jpeg')
+              canvas: canvas.toDataURL('image/jpeg') // optional preview
             });
+  
           } catch (e) {
             console.error("Error in image processing:", e);
             reject(e);
           }
         };
-
+  
         img.onerror = (e) => {
           console.error("Image loading failed:", e);
           reject("Image loading failed: " + e.type);
@@ -308,18 +342,58 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       }
     });
   };
-
+  
+  
   const runLocalInference = async (session, tensorData) => {
-    console.log("Creating tensor for local inference...");
-    const tensor = new Tensor('float32', tensorData, [1, 3, 224, 224]);
-
-    console.log("Running local inference...");
-    const feeds = { input: tensor };
+    // 1️⃣ grab ONNX input/output names
+    const inputName  = session.inputNames[0];
+    const outputName = session.outputNames[0];
+    console.log("ONNX input node:",  inputName);
+    console.log("ONNX output node:", outputName);
+  
+    // 2️⃣ build the tensor
+    console.log("Creating tensor for local inference…");
+    const tensor = new Tensor("float32", tensorData, [1, 3, 224, 224]);
+  
+    // 3️⃣ run the inference
+    console.log("Running local inference…");
+    const feeds = { [inputName]: tensor };
+    console.log("tensorData[0..10]:", tensorData.slice(0,10));
     const results = await session.run(feeds);
-    const output = results.output.data;
-    return output.indexOf(Math.max(...output));
+  
+    // 4️⃣ extract scores
+    const outputTensor = results[outputName];
+    const scores = Array.from(outputTensor.data);
+    console.log("Raw model scores:", scores);
+  
+    // 5️⃣ softmax helper
+    const softmax = (logits) => {
+      const exps = logits.map(Math.exp);
+      const sum = exps.reduce((a, b) => a + b, 0);
+      return exps.map(e => e / sum);
+    };
+  
+    const probs = softmax(scores);
+    console.log("Softmax probabilities:", probs.map(p => p.toFixed(4)));
+  
+    // 6️⃣ argmax helper
+    const argmax = (arr) => {
+      let maxIdx = 0, maxVal = arr[0];
+      for (let i = 1; i < arr.length; i++) {
+        if (arr[i] > maxVal) {
+          maxVal = arr[i];
+          maxIdx = i;
+        }
+      }
+      return maxIdx;
+    };
+  
+    const maxIdx = argmax(scores);
+    console.log(`→ Predicted class ${maxIdx} (p=${probs[maxIdx].toFixed(4)})`);
+  
+    return maxIdx;
   };
-
+  
   const runServerInference = async (imageData) => {
     try {
       console.log("Preparing for server inference...");
@@ -390,7 +464,8 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
     setProcessing(true);
   
     try {
-      if (!xrayImages || xrayImages.length === 0) {
+      // ─── validate image ───
+      if (!xrayImages?.length) {
         setError("No X-ray images available for processing");
         return;
       }
@@ -400,7 +475,8 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
         return;
       }
   
-      console.log("Processing image...");
+      // ─── preprocess ───
+      console.log("Processing image…");
       const { tensor: tensorData, canvas: processedImageDataUrl } =
         await preprocessImage(imageToProcess);
   
@@ -408,22 +484,23 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       if (inferenceMode === 'server') {
         classResult = await runServerInference(processedImageDataUrl);
       } else {
-        let session = model || (await handleDownloadModel());
+        // ─── always load or download model ───
+        const session = await loadOrDownloadModel();
         if (!session) {
           setError("Model loading failed. Please try again.");
           return;
         }
+        setModel(session);              // cache it
         classResult = await runLocalInference(session, tensorData);
       }
   
-      // ─── derive human label ───
+      // ─── map to human label ───
       const idx = classResult;
       const description = getClassDescription(idx);
       console.log("Predicted class index:", idx);
       console.log("Diagnosis:", description);
-      
+  
       setDiagnosisOutput(`Class ID: ${idx}\nDiagnosis: ${description}`);
-      // Set the prediction result in component state
       setPredictedClass(idx);
   
       // ─── saving to backend ───
@@ -431,18 +508,18 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       try {
         if (patientId) {
           console.log('Updating classification for patient:', patientId);
-          // Save both class ID and diagnosis description
+          // Save only class ID and diagnosis
           const response = await axios.put(
             `${backendApiUrl}/patients/modelEval/${patientId}`,
             {
-              modelevaluation: idx,  // Store the numeric class ID
-              evaluation: description // Store the text diagnosis
+              modelevaluation: idx,
+              modelDiagnosisText: description
             },
             { headers: { Authorization: `Bearer ${appToken}` } }
           );
           console.log("✅ Patient classification updated", response.data);
           
-          // Refresh evaluation data after saving
+          // Refresh evaluation data
           fetchModelEvaluation();
         } else {
           console.log('Creating new patient record');
@@ -461,13 +538,12 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
         console.error("API error:", apiErr);
         setError(`Failed to save results to server: ${apiErr.message}`);
       }
-      
-    } catch (err) {
-      // outer catch: any error in preprocessing/inference
+    }
+    catch (err) {
       console.error("Processing error:", err);
       setError(`Error during prediction: ${err.message}`);
-    } finally {
-      // always turn off spinner
+    }
+    finally {
       setProcessing(false);
     }
   };
@@ -494,46 +570,37 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
     return classNames[classId] || `Unknown Class (${classId})`;
   };
 
-  // FIXED: Updated renderEvaluationMetrics function to clearly indicate model evaluation results
+  // FIXED: Updated renderEvaluationMetrics function to properly display class ID and diagnosis
   const renderEvaluationMetrics = () => {
     if (loadingEvaluation) {
       return (
         <div className="text-gray-500 text-sm italic">
-          Loading model evaluation data...
+          Loading classification data...
         </div>
       );
     }
-  
-    if (errorEvaluation) {
-      return (
-        <div className="text-red-500 text-sm italic">
-          {errorEvaluation}
-        </div>
-      );
-    }
-  
+
     if (!modelEvaluation) {
       return (
         <div className="text-gray-500 text-sm italic">
-          No model evaluation data available
+          No classification data available
         </div>
       );
     }
-  
-    // Display the model's diagnosis results (not the doctor's evaluation)
+
     return (
       <div className="mt-4 bg-gray-50 p-4 rounded-md">
-        <h3 className="font-medium text-lg mb-2">AI Model Diagnosis</h3>
+        <h3 className="font-medium text-lg mb-2">Classification Result</h3>
         
         <div className="grid grid-cols-1 gap-y-2">
-          {/* Display Class ID from modelevaluation field */}
+          {/* Always display Class ID as bolded text */}
           <div>
             <span className="font-bold">Class ID:</span> {modelEvaluation.modelevaluation}
           </div>
           
-          {/* Display Diagnosis from evaluation field - this contains the model's diagnosis text */}
+          {/* Always display Diagnosis as bolded text */}
           <div>
-            <span className="font-bold">AI Diagnosis:</span> {modelEvaluation.evaluation}
+            <span className="font-bold">Diagnosis:</span> {modelEvaluation. modelDiagnosisText}
           </div>
         </div>
         
@@ -545,6 +612,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
       </div>
     );
   };
+
 
   return (
     <div>
@@ -568,7 +636,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
           {/* Results display */}
           <div className='w-1/2 flex flex-col text-black'>
             <div className='text-2xl font-bold mb-4'>
-              AI Model Classification
+              Classification Results
             </div>
             
             <div className="mb-4 flex items-center">
@@ -588,7 +656,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
             {predictedClass !== null ? (
               <div className='text-lg'>
                 <div className="mb-2"><span className="font-semibold">Class ID:</span> {predictedClass}</div>
-                <div><span className="font-semibold">AI Diagnosis:</span> {getClassDescription(predictedClass)}</div>
+                <div><span className="font-semibold">Diagnosis:</span> {getClassDescription(predictedClass)}</div>
               </div>
             ) : (
               <div className='text-base text-gray-500'>
@@ -616,7 +684,7 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
           </span>
         </div>
         
-        {/* Model Evaluation Section - Now explicitly shows AI model diagnosis */}
+        {/* Model Evaluation Section - Now displays classification results */}
         {renderEvaluationMetrics()}
         
         {/* Thumbnails for multiple images */}

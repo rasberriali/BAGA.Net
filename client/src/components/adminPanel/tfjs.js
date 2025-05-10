@@ -1,7 +1,10 @@
 // tfjsTraining.js
 
 // Utilities for training with image management/purging capabilities and TensorFlow.js model integration
-import { openDatabase, getAllImageIds, markImagesAsUsed, purgeUsedImages, getImagesByTrainingStatus } from '../utils/indexedDBUtils.js';
+import { openDatabase, getAllImageIds, markImagesAsUsed, purgeUsedImages, getImagesByTrainingStatus, getModel, storeModel } from '../utils/indexedDBUtils.js';
+
+
+
 
 // Re-export the necessary functions that metrics.jsx is trying to import
 export { getImagesByTrainingStatus };
@@ -72,56 +75,67 @@ if (isBrowser && !localStorage.getItem('clientId')) {
 // Retrieve the JWT you obtained from /api/token
 const JWT = isBrowser ? localStorage.getItem('jwtToken') : null;
 
-/**
- * Fetch the TensorFlow.js model from the server
- * @param {Function} progressCallback - Callback for download progress
- * @returns {Promise<Object>} - The model metadata and loading information
- */
-export const fetchTfjsModel = async (progressCallback = () => {}) => {
+const storedToken = localStorage.getItem('jwtToken');
+if (storedToken === 'null' || storedToken === null) {
+  localStorage.removeItem('jwtToken');
+}
+
+// Helper to get a clean JWT (or null)
+function getJwtToken() {
+  const token = localStorage.getItem('jwtToken');
+  return token && token !== 'null' ? token : null;
+}
+
+export async function fetchTfjsModel(progressCallback = () => {}) {
+  const tf = await import('@tensorflow/tfjs');
+
+  const defaultParams = {
+    epochs: 10,
+    batch_size: 8,
+    learning_rate: 0.001,
+    min_local_samples: 2
+  };
+
+  // Try loading from IndexedDB first
   try {
-    progressCallback(0);
-    console.log("Fetching TensorFlow.js model from server...");
-
-    const response = await fetch(`${API_CONFIG.BASE_URL}/tfjs/training_model`, {
-      method: 'GET',
-      headers: {
-        'X-API-Key': API_CONFIG.API_KEY,
-        'X-Client-ID': API_CONFIG.CLIENT_ID,
-        'Authorization': `Bearer ${JWT}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch model: ${response.status} ${response.statusText}`);
-    }
-
-    const modelInfo = await response.json();
-    progressCallback(0.5);
     
-    console.log("TensorFlow.js model metadata received:", modelInfo);
-    
-    // Load the actual model using TensorFlow.js
-    const tf = await import('@tensorflow/tfjs');
-    progressCallback(0.7);
-    
-    // Load the model directly from the provided URL
-    const model = await tf.loadLayersModel(modelInfo.model_url);
-    console.log("TensorFlow.js model loaded successfully");
-    
-    progressCallback(1);
-    
+    const model = await tf.loadLayersModel('indexeddb://tfjs_default');
+    console.log("✅ TFJS model loaded from IndexedDB");
     return {
       model,
-      modelInfo,
-      classNames: modelInfo.class_names,
-      inputShape: modelInfo.input_shape,
-      trainingParams: modelInfo.training_params
+      trainingParams: defaultParams
     };
-  } catch (error) {
-    console.error("Error fetching TensorFlow.js model:", error);
-    throw new Error(`Failed to download model: ${error.message}`);
+  } catch (err) {
+    console.warn("⚠️ Failed to load model from IndexedDB, fetching from server:", err);
   }
-};
+
+  // Fetch model from server as fallback
+  const res = await fetch("http://localhost:5050/tfjs/training_model", {
+    method: 'GET',
+    headers: {
+      'X-API-Key': 'FeDMl2025',
+      'X-Client-ID': localStorage.getItem('clientId')
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`❌ Failed to fetch TFJS model: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const model = await tf.loadLayersModel(data.model_url);
+
+  // Save model locally for next run
+  await model.save('indexeddb://tfjs_default');
+  console.log("✅ Fetched TFJS model saved to IndexedDB");
+
+  return {
+    model,
+    trainingParams: data.training_params || defaultParams
+  };
+}
+
+
 
 /**
  * Prepares image data for training by splitting into train/validation/test sets
@@ -244,6 +258,14 @@ export const prepareData = async (images, progressCallback = () => {}) => {
     shuffleArray(test);
     
     // Return the prepared data with image IDs for status tracking
+    console.log("Prepared dataset summary:", {
+      train: train.length,
+      val: validation.length,
+      test: test.length,
+      imageIds: imageIds.length,
+      classes: validClasses
+    });
+    
     return {
       train,
       validation,
@@ -388,15 +410,22 @@ export const trainModel = async (
         const modelVersion = `${Date.now().toString()}-v1`;
         
         // Create the training results
+        const modelArtifacts = await model.save(tf.io.withSaveHandler(async modelArtifacts => {
+          const modelVersionId = `tfjs_${Date.now()}`;
+          await storeModel(modelArtifacts, modelVersionId, 'xrayImagesDB');
+
+          return modelArtifacts;
+        }));
+        
         const trainingResults = {
-          model: model,
-          modelData: await model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts)),
+          model,
+          modelData: modelArtifacts,
           accuracy: Number(finalMetrics.accuracy).toFixed(4),
           loss: Number(finalMetrics.loss).toFixed(4),
           precision: Number(finalMetrics.precision).toFixed(4),
           recall: Number(finalMetrics.recall).toFixed(4),
           f1Score: Number(finalMetrics.f1Score).toFixed(4),
-          version: modelVersion,
+          version: `${Date.now().toString()}-v1`,
           classDistribution: preparedData.distribution,
           trainSize: preparedData.train.length,
           valSize: preparedData.validation.length,
@@ -405,6 +434,13 @@ export const trainModel = async (
           timestamp: new Date().toISOString()
         };
         
+        const weightMap = {};
+        model.getWeights().forEach((tensor, idx) => {
+          const name = model.layers[idx]?.name || `layer${idx}`;
+          weightMap[`${name}`] = Array.from(tensor.dataSync());
+        });
+        trainingResults.weights = weightMap;
+
         // Submit trained model to server if requested
         if (submitToServer) {
             progressCallback(0.95);
@@ -499,6 +535,7 @@ export const trainModel = async (
       // Calculate training time
       const trainingEndTime = performance.now();
       const trainingTimeMs = trainingEndTime - trainingStartTime;
+      await markImagesAsUsed(preparedData.imageIds);
       
       // Evaluate on test set for final metrics
       let testResults = { loss: 0, acc: 0 };
@@ -556,6 +593,7 @@ export const trainModel = async (
         timestamp: new Date().toISOString()
       };
       
+
       // Submit trained model to server if requested
       if (submitToServer) {
         progressCallback(0.95);
@@ -968,7 +1006,7 @@ const applyCLAHE = (data, width, height, clipLimit = 2.0, tileGridSize = [8, 8])
       
       // Create a second canvas for center cropping to 224x224
       const cropCanvas = document.createElement('canvas');
-      const cropCtx = cropCanvas.getContext('2d');
+      const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
       
       // Set crop canvas size to 224x224 (matching CenterCrop in PyTorch)
       cropCanvas.width = 224;
@@ -1159,113 +1197,7 @@ const calculateAdditionalMetrics = (confusionMatrix) => {
   };
 };
 
-/**
- * Submits trained model weights and metrics to the server
- * @param {Object} trainedModel - Trained TensorFlow.js model and related data
- * @param {Object} systemMetrics - Optional system metrics about the training environment
- * @returns {Promise<Object>} - Server response data
- */
-export const submitTrainedModel = async (trainedModel, systemMetrics = {}) => {
-    try {
-      if (!trainedModel || !trainedModel.model) {
-        throw new Error("No trained model provided");
-      }
-      
-      console.log("Preparing to submit trained model to server...");
-  
-      // Extract model artifacts for submission
-      const modelArtifacts = await trainedModel.model.save(
-        tf.io.withSaveHandler(async artifacts => artifacts)
-      );
-      
-      // Format the weights data in the way the server expects
-      const weightsData = {};
-      
-      // Format depends on the TensorFlow.js version and model format
-      if (modelArtifacts.weightData) {
-        // Handle binary weight format (more efficient)
-        // The server expects a JSON structure, so we'll need to convert the binary weights
-        
-        // Create a mapping of weight names to their values
-        const weightSpecs = modelArtifacts.weightSpecs;
-        let offset = 0;
-        
-        // Convert the binary weight data to a structured format
-        for (const spec of weightSpecs) {
-          const key = spec.name;
-          const shape = spec.shape;
-          const size = shape.reduce((a, b) => a * b, 1);
-          const dataType = spec.dtype;
-          
-          // Create a view into the arraybuffer for this weight
-          const typedArray = getTypedArrayForDType(dataType, modelArtifacts.weightData, offset, size);
-          
-          // Convert to regular array for JSON serialization
-          weightsData[key] = Array.from(typedArray);
-          
-          // Move the offset for the next weight
-          offset += size * bytesPerElement(dataType);
-        }
-      } else if (modelArtifacts.weights) {
-        // Handle direct weights object format
-        for (const key in modelArtifacts.weights) {
-          const tensor = modelArtifacts.weights[key];
-          weightsData[key] = Array.from(tensor.dataSync());
-        }
-      } else {
-        throw new Error("Unsupported model artifact format");
-      }
-      
-      // Prepare payload that matches the server's expected format
-      const payload = {
-        weights: weightsData,
-        metrics: {
-          accuracy: parseFloat(trainedModel.accuracy || 0),
-          loss: parseFloat(trainedModel.loss || 0),
-          precision: parseFloat(trainedModel.precision || 0),
-          recall: parseFloat(trainedModel.recall || 0),
-          f1Score: parseFloat(trainedModel.f1Score || 0)
-        },
-        round: 0, // Default to round 0, could be passed as parameter if needed
-        num_samples: trainedModel.trainSize || 0,
-        timestamp: new Date().toISOString(),
-        system_metrics: systemMetrics
-      };
-      
-      console.log("Submitting trained model to server...");
-      
-      // Get JWT and API credentials
-      const JWT = localStorage.getItem('jwtToken');
-      const API_KEY = "FeDMl2025"; // Should be loaded securely
-      const CLIENT_ID = localStorage.getItem('clientId') || `client-${Date.now()}`;
-      
-      // Make the API request
-      const response = await fetch("http://localhost:5050/tfjs/submit_weights", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': API_KEY,
-          'X-Client-ID': CLIENT_ID,
-          'Authorization': `Bearer ${JWT}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Server error: ${error.message || response.statusText}`);
-      }
-      
-      const result = await response.json();
-      console.log("Model submission successful:", result);
-      
-      return result;
-    } catch (error) {
-      console.error("Error submitting trained model:", error);
-      throw error;
-    }
-  };
-  
+
   /**
    * Helper function to get typed array view based on dtype
    */
@@ -1301,3 +1233,166 @@ export const submitTrainedModel = async (trainedModel, systemMetrics = {}) => {
         throw new Error(`Unsupported dtype: ${dtype}`);
     }
   }
+
+
+  async function getLatestTfjsModel() {
+    const db = await openDatabase('xrayImagesDB');
+  
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('models', 'readonly');
+      const store = tx.objectStore('models');
+      const req = store.getAll();
+  
+      req.onsuccess = () => {
+        const models = req.result
+          .filter(m => m.id.startsWith('tfjs_'))
+          .sort((a, b) => b.timestamp - a.timestamp);
+  
+        if (models.length === 0) {
+          resolve(null);
+          return;
+        }
+  
+        const blob = models[0].modelBlob;
+  
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+  
+            if (
+              parsed.modelTopology &&
+              parsed.weightSpecs &&
+              parsed.weightData
+            ) {
+              // Convert weightData back to ArrayBuffer
+              parsed.weightData = new Uint8Array(parsed.weightData).buffer;
+              resolve(parsed);
+            } else {
+              console.error("Malformed modelArtifacts:", parsed);
+              resolve(null);
+            }
+          } catch (err) {
+            console.error("Failed to parse model blob as JSON:", err);
+            resolve(null);
+          }
+        };
+  
+        reader.onerror = (e) => {
+          reject(`FileReader error: ${e.target.error}`);
+        };
+  
+        reader.readAsText(blob); // Assume it's a JSON blob
+      };
+  
+      req.onerror = (e) => reject(`Model list error: ${e.target.errorCode}`);
+    });
+  }
+  
+
+/**
+ * Submits trained model weights and metrics to the server
+ * @param {Object} trainedModel - Trained TensorFlow.js model and related data
+ * @param {Object} systemMetrics - Optional system metrics about the training environment
+ * @returns {Promise<Object>} - Server response data
+ */
+export const submitTrainedModel = async (trainedModel, systemMetrics = {}) => {
+  try {
+    if (!trainedModel || !trainedModel.model) {
+      throw new Error("No trained model provided");
+    }
+    
+    console.log("Preparing to submit trained model to server...");
+
+    // Extract model artifacts for submission
+    const modelArtifacts = await trainedModel.model.save(
+      tf.io.withSaveHandler(async artifacts => artifacts)
+    );
+    
+    // Format the weights data in the way the server expects
+    const weightsData = {};
+    
+    // Format depends on the TensorFlow.js version and model format
+    if (modelArtifacts.weightData) {
+      // Handle binary weight format (more efficient)
+      // The server expects a JSON structure, so we'll need to convert the binary weights
+      
+      // Create a mapping of weight names to their values
+      const weightSpecs = modelArtifacts.weightSpecs;
+      let offset = 0;
+      
+      // Convert the binary weight data to a structured format
+      for (const spec of weightSpecs) {
+        const key = spec.name;
+        const shape = spec.shape;
+        const size = shape.reduce((a, b) => a * b, 1);
+        const dataType = spec.dtype;
+        
+        // Create a view into the arraybuffer for this weight
+        const typedArray = getTypedArrayForDType(dataType, modelArtifacts.weightData, offset, size);
+        
+        // Convert to regular array for JSON serialization
+        weightsData[key] = Array.from(typedArray);
+        
+        // Move the offset for the next weight
+        offset += size * bytesPerElement(dataType);
+      }
+    } else if (modelArtifacts.weights) {
+      // Handle direct weights object format
+      for (const key in modelArtifacts.weights) {
+        const tensor = modelArtifacts.weights[key];
+        weightsData[key] = Array.from(tensor.dataSync());
+      }
+    } else {
+      throw new Error("Unsupported model artifact format");
+    }
+    
+    // Prepare payload that matches the server's expected format
+    const payload = {
+      weights: weightsData,
+      metrics: {
+        accuracy: parseFloat(trainedModel.accuracy || 0),
+        loss: parseFloat(trainedModel.loss || 0),
+        precision: parseFloat(trainedModel.precision || 0),
+        recall: parseFloat(trainedModel.recall || 0),
+        f1Score: parseFloat(trainedModel.f1Score || 0)
+      },
+      round: 0, // Default to round 0, could be passed as parameter if needed
+      num_samples: trainedModel.trainSize || 0,
+      timestamp: new Date().toISOString(),
+      system_metrics: systemMetrics
+    };
+    
+    console.log("Submitting trained model to server...");
+    
+    // Get JWT and API credentials
+    const JWT = localStorage.getItem('jwtToken');
+    const API_KEY = "FeDMl2025"; // Should be loaded securely
+    const CLIENT_ID = localStorage.getItem('clientId') || `client-${Date.now()}`;
+    
+    // Make the API request
+    const response = await fetch("http://localhost:5050/tfjs/submit_weights", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': API_KEY,
+        'X-Client-ID': CLIENT_ID,
+        'Authorization': `Bearer ${JWT}`
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Server error: ${error.message || response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log("Model submission successful:", result);
+    
+    return result;
+  } catch (error) {
+    console.error("Error submitting trained model:", error);
+    throw error;
+  }
+};

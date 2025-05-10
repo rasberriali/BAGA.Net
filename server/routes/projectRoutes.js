@@ -184,10 +184,13 @@ router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
   }
 });
 
-router.get("/patients", (req, res) => {
-  PatientDetailsModel.find()
-    .then((patients) => res.status(200).json(patients))
-    .catch((err) => res.status(500).json({ error: err.message }));
+router.get("/patients", auth, async (req, res) => {
+  try {
+    const patients = await PatientDetailsModel.find({ createdBy: req.user.id });
+    res.status(200).json(patients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete("/deletePatient/:id", auth, async (req, res) => {

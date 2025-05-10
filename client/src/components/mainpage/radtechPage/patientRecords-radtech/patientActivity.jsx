@@ -13,11 +13,41 @@ import {
   getAllStoredImages, 
   getImagesByPatientId, 
   revokeObjectURLs,
-  base64ToBlob
+  base64ToBlob,
+  storeExists,
+  getModel,
+  storeModel
 } from '../../../utils/indexedDBUtils';
+
+const getAuthToken = async (clientId = "web-client") => {
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
+  const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
+  
+  try {
+    const response = await axios.post(`${modelServerUrl}/api/token`, 
+      { client_id: clientId },
+      { 
+        headers: { 
+          'X-API-Key': apiKey,
+          'X-Client-ID': clientId
+        }
+      }
+    );
+    
+    // Store token in localStorage
+    localStorage.setItem('fedml_token', response.data.access_token);
+    
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Error getting FedML auth token:', error);
+    throw error;
+  }
+};
+
 
 const PatientActivity = () => {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
   const [patients, setPatients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -34,6 +64,10 @@ const PatientActivity = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [searchTerm, setSearchTerm] = useState('');
+  const [grabStatus, setGrabStatus] = useState('');
+  const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
+  const [authToken, setAuthToken] = useState(null);
+  
 
   // Check for network status changes
   useEffect(() => {
@@ -62,6 +96,12 @@ const PatientActivity = () => {
     };
   }, [isOffline]);
 
+
+
+  
+  useEffect(() => {
+    if (!localStorage.getItem('modelVersion')) localStorage.setItem('modelVersion', '0');
+  }, []);
 
   const fetchPatients = async () => {
     try {
@@ -181,6 +221,195 @@ const PatientActivity = () => {
     }
   };
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData({ name: '', location: '', age: '', gender: '' });
+    setFiles([]);
+    setSubmittedImage(null);
+    setValidationErrors({});
+    setError(null);
+  };
+
+
+  const handleGrabModel = async () => {
+    try {
+      const dbName = 'xrayImagesDB';
+      const tf = await import('@tensorflow/tfjs');
+  
+      // 1) Make sure we have a valid JWT
+      let token = localStorage.getItem('fedml_token');
+      if (!token) {
+        console.log('No token found, requesting new one...');
+        token = await getAuthToken();
+        localStorage.setItem('fedml_token', token);
+      }
+      
+      // Debug token
+      console.log('Using token (first 10 chars):', token.substring(0, 10) + '...');
+  
+      const models = await tf.io.listModels();
+      console.log('Available models:', models);
+      
+      // 2) Ensure models store exists (this may upgrade DB)
+      const hasModelsStore = await storeExists('models', dbName);
+      if (!hasModelsStore) {
+        console.log('Creating models store in IndexedDB...');
+        await openDatabase(dbName); // Will auto-upgrade and create 'models' store
+      }
+  
+      // 3) Check for model existence
+      const onnxBlob = await getModel('onnx_default', dbName);
+      const tfjsBlob = await getModel('tfjs_default', dbName);
+  
+      // 4) Conditionally download only missing models
+      if (!onnxBlob) {
+        console.log('⬇️ Downloading missing ONNX model...');
+        
+        // Debug server URL
+        console.log('ONNX Fetch URL:', `${modelServerUrl}/model`);
+        
+        const onnxResponse = await fetch(`${modelServerUrl}/model`, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'X-API-Key': apiKey,
+            'Authorization': `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
+          }
+        });
+  
+        if (!onnxResponse.ok) {
+          const errorText = await onnxResponse.text();
+          console.error('ONNX Response Error:', {
+            status: onnxResponse.status,
+            statusText: onnxResponse.statusText,
+            headers: Object.fromEntries(onnxResponse.headers.entries()),
+            preview: errorText.substring(0, 200)
+          });
+          throw new Error(`ONNX model download failed: ${onnxResponse.status} - ${onnxResponse.statusText}`);
+        }
+  
+        const onnxArrayBuffer = await onnxResponse.arrayBuffer();
+        await storeModel(onnxArrayBuffer, 'onnx_default', dbName);
+        console.log('✅ ONNX model saved to IndexedDB');
+      } else {
+        console.log('✅ ONNX model already in IndexedDB');
+      }
+  
+      // If TFJS model isn't already saved, fetch and store
+      if (!models['indexeddb://tfjs_default']) {
+        console.log('⬇️ Downloading TFJS model...');
+        
+        // Debug server URL
+        console.log('TFJS Fetch URL:', `${modelServerUrl}/tfjs/training_model`);
+      
+  
+        const response = await fetch(
+          `${modelServerUrl}/tfjs/training_model`,
+          {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'X-API-Key': apiKey,
+
+              'ngrok-skip-browser-warning': 'true',
+            }
+          }
+        );
+  
+        // Log response headers for debugging
+        console.log('TFJS Response headers:', Object.fromEntries(response.headers.entries()));
+        console.log('TFJS Response status:', response.status, response.statusText);
+  
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('TFJS Error Response:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            preview: errorText.substring(0, 200)
+          });
+          throw new Error(`TFJS model fetch failed: ${response.status} - ${response.statusText}`);
+        }
+  
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('Unexpected response content type:', contentType);
+          console.error('Response preview:', text.substring(0, 500));
+          
+          // Attempt to parse as JSON anyway in case content-type is wrong
+          if (text.trim().startsWith('{')) {
+            try {
+              const jsonData = JSON.parse(text);
+              console.log('Successfully parsed response as JSON despite content-type');
+              
+              // Continue with model loading using parsed data
+              const rawUrl = jsonData.model_url;
+              const modelUrl = rawUrl.startsWith('http')
+                ? rawUrl
+                : `${modelServerUrl}${rawUrl}`;
+              console.log(`📥 Loading model from ${modelUrl}`);
+  
+              const model = await tf.loadLayersModel(modelUrl);
+  
+              // Save using TensorFlow.js built-in IndexedDB
+              await model.save('indexeddb://tfjs_default');
+              console.log('✅ TFJS model saved to IndexedDB');
+              setGrabStatus('Models ready in IndexedDB');
+              return; // Exit early since we recovered
+            } catch (parseError) {
+              console.error('Failed to parse response as JSON:', parseError);
+            }
+          }
+          
+          throw new Error(
+            `Expected JSON but received ${contentType}: ${text.substring(0, 200)}`
+          );
+        }
+  
+        const modelInfo = await response.json();
+        console.log('Model info received:', modelInfo);
+        
+        // Construct absolute URL for model.json
+        const rawUrl = modelInfo.model_url;
+        const modelUrl = rawUrl.startsWith('http')
+          ? rawUrl
+          : `${modelServerUrl}${rawUrl}`;
+        console.log(`📥 Loading model from ${modelUrl}`);
+  
+        try {
+          const model = await tf.loadLayersModel(modelUrl);
+  
+          // Save using TensorFlow.js built-in IndexedDB
+          await model.save('indexeddb://tfjs_default');
+          console.log('✅ TFJS model saved to IndexedDB');
+        } catch (modelError) {
+          console.error('Error loading or saving model:', modelError);
+          throw new Error(`Failed to load or save model: ${modelError.message}`);
+        }
+      } else {
+        console.log('✅ TFJS model already in IndexedDB');
+      }
+  
+      setGrabStatus('Models ready in IndexedDB');
+    } catch (err) {
+      console.error('Error in handleGrabModel:', err);
+      setGrabStatus(`Error: ${err.message}`);
+      
+      // Suggest solutions based on error type
+      if (err.message.includes('HTML')) {
+        console.error('Authentication issue detected - received HTML instead of JSON');
+        console.log('Potential solutions:');
+        console.log('1. Check if your token is valid');
+        console.log('2. Make sure your server is running and accessible');
+        console.log('3. Verify API key is correct');
+        console.log('4. Check for redirects or authentication issues');
+      }
+    }
+  };
+  
   
   const handleRemoveFile = (index) => {
     // Revoke the object URL to prevent memory leaks
@@ -266,6 +495,7 @@ const PatientActivity = () => {
       setFormData({ name: '', location: '', age: '', gender: '' });
       setFiles([]);
       setFilePreviewUrls([]);
+      closeModal();
     
     } catch (error) {
       console.error('Error uploading files:', error);
@@ -334,6 +564,16 @@ const PatientActivity = () => {
                 >
                   Add Patient
                 </div>
+
+                <div
+                  className="p-2 px-6 text-base text-white bg-blue-500 rounded-lg hover:bg-blue-600 cursor-pointer"
+                  onClick={() => {
+                    handleGrabModel();
+                  }}
+                >
+                  Grab Model
+                </div>
+                
                 {isModalOpen && (
                   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-96">
@@ -401,6 +641,7 @@ const PatientActivity = () => {
                         {validationErrors.gender && (
                           <p className="text-red-500 text-sm mt-1">{validationErrors.gender}</p>
                         )}
+                        
                       </div>
 
                       <section className="py-2 w-full h-64">

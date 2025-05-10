@@ -29,13 +29,8 @@ export default function DoctorsEvaluation({ evaluation, findings, xrayImages, pa
     const evalText = evaluation.toLowerCase();
     if (evalText.includes('normal')) return 'Normal';
     if (evalText.includes('pneumonia')) return 'Pneumonia';
-    if (evalText.includes('fibrosis')) return 'Fibrosis';
     if (evalText.includes('edema')) return 'Edema';
     if (evalText.includes('covid')) return 'COVID-19';
-    if (evalText.includes('tuberculosis') || evalText.includes('tb')) return 'Tuberculosis';
-    if (evalText.includes('bronchitis')) return 'Bronchitis';
-    if (evalText.includes('emphysema')) return 'Emphysema';
-    if (evalText.includes('pleural effusion')) return 'Pleural Effusion';
     if (evalText.includes('pneumothorax')) return 'Pneumothorax';
     
     // If no specific condition is found, check for abnormal terms

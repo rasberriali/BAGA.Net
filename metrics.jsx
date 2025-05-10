@@ -147,7 +147,7 @@ const Metrics = () => {
       // Continue with the rest of your existing training code...
       setCurrentPhase('testing');
       const results = await trainModel(
-        prepared,
+        { model, preparedData: prepared },
         p => setProgress(50 + p * 0.4),
         epoch => setEpochInfo(prev => [...prev, epoch]),
         true // submitToServer

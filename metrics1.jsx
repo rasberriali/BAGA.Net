@@ -29,64 +29,176 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"
 
-// TensorFlow.js training utilities and submission
-import {
-  fetchTfjsModel,
-  prepareData,
-  trainModel,
-  submitTrainedModel,
-  manualPurgeUsedImages,
-  getImagesByTrainingStatus,
-} from './tfjs.js'
-
+// Import the IndexedDB utilities and ONNX training functions
 import { getAllStoredImages, getStorageStats } from '../utils/indexedDBUtils.js';
+import { prepareData, trainModel, sendWeightsToServer, manualPurgeUsedImages, getImagesByTrainingStatus } from "./onnxTraining.js";
 
-const Metrics = () => {
-  const [progress, setProgress] = useState(0)
-  const [epochInfo, setEpochInfo] = useState([])
-  const [error, setError] = useState(null)
-  const [imageCount, setImageCount] = useState(0)
-  const [isTraining, setIsTraining] = useState(false)
-  const [purging, setPurging] = useState(false)
-  const [localMetrics, setLocalMetrics] = useState({ date: '-', accuracy: '-', precision: '-', recall: '-', f1Score: '-' })
-  const [metricsHistory, setMetricsHistory] = useState([])
-  const [globalMetrics, setGlobalMetrics] = useState({ date: '-', accuracy: '-', precision: '-', recall: '-', f1Score: '-', version: '' })
-  const [currentPhase, setCurrentPhase] = useState('training')
-  const [weightsSendProgress, setWeightsSendProgress] = useState(0)
+function Metrics() {
+  // Original state
+  const [progress, setProgress] = useState(0);
+  
+  // Add new state for model training and metrics
+  const [isTraining, setIsTraining] = useState(false);
+  const [localMetrics, setLocalMetrics] = useState({
+    accuracy: "-",
+    precision: "-",
+    recall: "-",
+    f1Score: "-",
+    date: new Date().toLocaleDateString()
+  });
+  const [globalMetrics, setGlobalMetrics] = useState({
+    accuracy: "-",
+    precision: "-",
+    recall: "-",
+    f1Score: "-",
+    date: new Date().toLocaleDateString()
+  });
+  const [epochInfo, setEpochInfo] = useState([]);
+  const [weightsSendProgress, setWeightsSendProgress] = useState(0);
+  const [metricsHistory, setMetricsHistory] = useState([]);
+  const [error, setError] = useState(null);
+  const [imageCount, setImageCount] = useState(0);
+  const [purging, setPurging] = useState(false);
+  
+  const API_BASE_URL = "http://localhost:5050";
+  const API_KEY = "FeDMl2025"; // In a real app, store this securely
 
-  // Function to determine background class based on current phase
-  const getBgClass = (phase) =>
-    currentPhase === phase ? 'bg-green-200 ring-green-400 font-bold' : 'bg-white';
+  // Handle image purging using the imported function from onnxTraining
+  const handlePurgeUsedImages = async () => {
+    setPurging(true);
+    try {
+      const purgedCount = await manualPurgeUsedImages();
+      alert(`Successfully purged ${purgedCount} used images.`);
+      
+      // Update image stats after purging
+      const stats = await getStorageStats();
+      setImageCount(stats.totalImages || 0);
+    } catch (err) {
+      console.error("Error purging images:", err);
+      alert("Failed to purge used images.");
+    } finally {
+      setPurging(false);
+    }
+  };
 
+  // Fetch global metrics on component mount
   useEffect(() => {
-    async function loadImages() {
+    fetchGlobalMetrics();
+
+    // Check image count on mount
+    const checkImageCount = async () => {
       try {
         const stats = await getStorageStats();
         setImageCount(stats.totalImages || 0);
       } catch (err) {
         console.error("Error fetching image stats:", err);
-        setError("Failed to fetch image stats");
       }
-    }
-    loadImages();
-  
-    fetchGlobalMetrics();
+    };
+    
+    checkImageCount();
     
     // Set up interval to refresh global metrics every 30 seconds
     const intervalId = setInterval(fetchGlobalMetrics, 30000);
     
     // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, [])
+  }, []);
 
-  const handleTrainModel = async () => {
-    setError(null);
-    setIsTraining(true);
-    setProgress(0);
-    setEpochInfo([]);
+  // Modified useEffect for progress simulation that respects isTraining state
+  useEffect(() => {
+    if (!isTraining) return;
+    
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 1;
+      });
+    }, 500); 
+    
+    return () => clearInterval(interval);
+  }, [isTraining]);
+
+  const getPhase = (value) => {
+    if (value < 33.33) return 'training';
+    if (value < 66.66) return 'validation';
+    return 'testing';
+  };
+
+  const currentPhase = getPhase(progress);
+
+  const getBgClass = (phase) =>
+    currentPhase === phase ? 'bg-green-200 ring-green-400 font-bold' : 'bg-white';
   
+  // Function to fetch global metrics from server
+  const fetchGlobalMetrics = async () => {
     try {
-      // Get all images from IndexedDB instead of using getImagesByTrainingStatus
+      const response = await fetch(`${API_BASE_URL}/metrics`, {
+        method: 'GET',
+        headers: {
+          'X-API-Key': API_KEY
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch metrics: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.latest_metrics && data.latest_metrics.metrics) {
+        const metrics = data.latest_metrics.metrics;
+        
+        setGlobalMetrics({
+          accuracy: metrics.accuracy || "-",
+          precision: metrics.precision || "-",
+          recall: metrics.recall || "-",
+          f1Score: metrics.f1_score || "-", // Note: server uses snake_case
+          version: data.current_version,
+          date: new Date().toLocaleDateString()
+        });
+        
+        // If history is included, update the history state
+        if (data.history && Array.isArray(data.history)) {
+          const formattedHistory = data.history.map(item => ({
+            id: item.version,
+            accuracy: item.metrics.accuracy || "-",
+            precision: item.metrics.precision || "-",
+            recall: item.metrics.recall || "-",
+            f1Score: item.metrics.f1_score || "-", // Note: server uses snake_case
+            date: new Date(item.timestamp || Date.now()).toLocaleDateString()
+          }));
+          
+          // Only update if there's new data
+          if (formattedHistory.length > 0) {
+            setMetricsHistory(prev => {
+              // Merge and deduplicate
+              const combined = [...formattedHistory, ...prev];
+              return combined.filter((item, index, self) => 
+                index === self.findIndex(t => t.id === item.id)
+              );
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching global metrics:", error);
+      // Don't set error state to avoid UI disruption
+    }
+  };
+    
+  // Function to handle model training
+  const handleTrainModel = async () => {
+    try {
+      setError(null);
+      setIsTraining(true);
+      setProgress(0);
+      setEpochInfo([]);
+      setWeightsSendProgress(0);
+      
+      // Get all images from IndexedDB
       const images = await getAllStoredImages();
       
       if (images.length === 0) {
@@ -98,145 +210,94 @@ const Metrics = () => {
       // Update image count
       setImageCount(images.length);
       
-      // Modified fetch model with better CORS handling
-      const fetchModelWithRetry = async () => {
-        try {
-          return await fetchTfjsModel(p => setProgress(p * 0.2));
-        } catch (fetchErr) {
-          // If there's a CORS error, log it but don't fail immediately
-          if (fetchErr.message && fetchErr.message.includes('CORS')) {
-            console.error("CORS error detected, retrying with different approach:", fetchErr);
-            
-            // Simple retry with a slight delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Attempt a different fetch approach 
-            const modelRes = await fetch('http://localhost:5050/tfjs/training_model', {
-              method: 'GET',
-              headers: { 
-                'X-API-Key': 'FeDMl2025', 
-                'X-Client-ID': localStorage.getItem('clientId') 
-              },
-              mode: 'cors',
-              credentials: 'same-origin'
-            });
-            
-            if (!modelRes.ok) {
-              throw new Error(`Failed to fetch model: ${modelRes.status}`);
-            }
-            
-            const modelData = await modelRes.json();
-            // Process the data similar to what fetchTfjsModel would do
-            return {
-              model: await tf.loadLayersModel(modelData.model_url),
-              trainingParams: modelData.training_params
-            };
-          }
-          throw fetchErr; // Re-throw if it's not a CORS error
-        }
-      };
-      
-      const { model, trainingParams } = await fetchModelWithRetry();
-      setProgress(20);
-  
-      // Continue with existing code for preparing data
-      setCurrentPhase('validation');
-      setProgress(25);
-      const prepared = await prepareData(images, p => setProgress(25 + p * 0.25));
-  
-      // Continue with the rest of your existing training code...
-      setCurrentPhase('testing');
-      const results = await trainModel(
-        prepared,
-        p => setProgress(50 + p * 0.4),
-        epoch => setEpochInfo(prev => [...prev, epoch]),
-        true // submitToServer
-      );
-      setProgress(95);
-  
-      // Update local metrics
-      setLocalMetrics({ 
-        date: new Date().toLocaleDateString(), 
-        accuracy: results.accuracy, 
-        precision: results.precision, 
-        recall: results.recall, 
-        f1Score: results.f1Score 
+      // Prepare images for training - Update how we handle progress to match onnxTraining
+      const preparedData = await prepareData(images, (prepProgress) => {
+        // Update UI with preparation progress (0-30%)
+        setProgress(Math.floor(prepProgress * 30));
       });
-      setMetricsHistory(prev => [results, ...prev]);
-  
-    } catch (err) {
-      console.error("Training error:", err);
-      setError(err.message || "Unknown training error occurred");
+      
+      if (!preparedData || preparedData.totalCount === 0) {
+        throw new Error("Failed to prepare training data");
+      }
+      
+      console.log(`Prepared ${preparedData.totalCount} images for training.`);
+      console.log(`Train: ${preparedData.train.length}, Validation: ${preparedData.validation.length}, Test: ${preparedData.test.length}`);
+      
+      // Train the model - progress from 30% to 80%
+      const results = await trainModel(
+        preparedData,
+        (trainProgress) => setProgress(30 + Math.floor(trainProgress * 50)),
+        (epochData) => setEpochInfo(prevInfo => [...prevInfo, epochData])
+      );
+      
+      // Update local metrics - ensure property naming matches
+      setLocalMetrics({
+        accuracy: results.accuracy || "-",
+        precision: results.precision || "-",
+        recall: results.recall || "-",
+        f1Score: results.f1Score || "-", // Use camelCase in UI
+        version: results.version || Date.now().toString(),
+        date: new Date().toLocaleDateString()
+      });
+      
+      // Add to history with consistent ID handling
+      setMetricsHistory(prev => [
+        {
+          id: results.version || Date.now().toString(),
+          accuracy: results.accuracy || "-",
+          precision: results.precision || "-",
+          recall: results.recall || "-",
+          f1Score: results.f1Score || "-",
+          date: new Date().toLocaleDateString()
+        },
+        ...prev
+      ]);
+      
+      // Send weights to server - progress from 80% to 100%
+      await sendWeightsToServer(
+        results,
+        (sendProgress) => {
+          setWeightsSendProgress(sendProgress);
+          // Also update overall progress (80-100%)
+          setProgress(80 + Math.floor(sendProgress * 0.2));
+        },
+        false // Don't auto-purge after upload
+      );
+      
+      // Set final progress to 100%
+      setProgress(100);
+      
+      // Fetch updated global metrics after submission
+      await fetchGlobalMetrics();
+      
+    } catch (error) {
+      console.error("Training error:", error);
+      setError(`Error during training: ${error.message || "Unknown error"}`);
     } finally {
       setIsTraining(false);
-      setProgress(0);
     }
-  }
+  };
 
-  const handlePurgeUsedImages = async () => {
-    setPurging(true);
+  // Function to check server health
+  const checkServerHealth = async () => {
     try {
-      const purgedCount = await manualPurgeUsedImages();
-      
-      // Update image stats after purging
-      const stats = await getStorageStats();
-      setImageCount(stats.totalImages || 0);
-    } catch (err) {
-      console.error("Error purging images:", err);
-      setError("Failed to purge used images");
-    } finally {
-      setPurging(false);
-    }
-  }
-  // Updated fetchGlobalMetrics function with better error handling
-const fetchGlobalMetrics = async () => {
-  try {
-    const res = await fetch('http://localhost:5050/tfjs/metrics', {
-      method: 'GET',
-      headers: { 
-        'X-API-Key': 'FeDMl2025', 
-        'X-Client-ID': localStorage.getItem('clientId') 
-      },
-      // Add mode: 'cors' to explicitly request CORS
-      mode: 'cors',
-      // Add credentials handling if necessary
-      credentials: 'same-origin'
-    })
-    
-    if (!res.ok) {
-      throw new Error(`Server responded with status: ${res.status}`);
-    }
-    
-    const data = await res.json()
-    
-    if (data && data.metrics) {
-      setGlobalMetrics({ 
-        date: data.timestamp || new Date().toLocaleDateString(), 
-        accuracy: data.metrics.accuracy || '-', 
-        precision: data.metrics.precision || '-', 
-        recall: data.metrics.recall || '-', 
-        f1Score: data.metrics.f1_score || '-', 
-        version: data.version || ''
-      })
-    }
-  } catch (err) {
-    console.error("Error fetching global metrics:", err);
-    setError(`Failed to fetch global metrics: ${err.message}`);
-    
-    // Keep previous metrics if available
-    if (globalMetrics.date === '-') {
-      setGlobalMetrics({
-        date: new Date().toLocaleDateString(),
-        accuracy: 'N/A', 
-        precision: 'N/A', 
-        recall: 'N/A', 
-        f1Score: 'N/A',
-        version: 'unavailable'
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET'
       });
+      
+      if (!response.ok) {
+        throw new Error(`Server health check failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Server health:", data);
+      
+      return data.status === 'healthy';
+    } catch (error) {
+      console.error("Server health check error:", error);
+      return false;
     }
-  }
-}
-
+  };
 
   return (
   
