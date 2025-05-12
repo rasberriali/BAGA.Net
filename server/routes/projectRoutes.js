@@ -10,19 +10,7 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// Configure multer for file storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -133,7 +121,7 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Protected routes
+// Uploading route
 router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
   try {
     console.log('Request body:', req.body);
@@ -142,17 +130,15 @@ router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
 
     const { name, location, age, gender } = req.body;
     
-    // Convert files to base64
+   // Convert files to base64
     const xrayBase64 = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        const fileBuffer = fs.readFileSync(file.path);
-        const base64 = fileBuffer.toString('base64');
+        const base64 = file.buffer.toString('base64');
         xrayBase64.push(base64);
-        // Clean up the temporary file
-        fs.unlinkSync(file.path);
       }
     }
+
 
     // Validate required fields
     if (!name || !location || !age || !gender) {
@@ -182,11 +168,15 @@ router.post("/addPatient", auth, upload.array("xray", 5), async (req, res) => {
   }
 });
 
-router.get("/patients", (req, res) => {
-  PatientDetailsModel.find()
-    .then((patients) => res.status(200).json(patients))
-    .catch((err) => res.status(500).json({ error: err.message }));
+router.get("/patients", auth, async (req, res) => {
+  try {
+    const patients = await PatientDetailsModel.find({ createdBy: req.user.id });
+    res.status(200).json(patients);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 router.delete("/deletePatient/:id", auth, async (req, res) => {
   try {
@@ -290,16 +280,16 @@ router.get("/dashboard-counts", auth, async (req, res) => {
   }
 });
 
-router.get("/doctors", auth, async (req, res) => {
-  try {
-    const doctors = await UserAuthModel.find({ role: "doctor" })
-      .select("username _id")
-      .lean();
-    res.status(200).json(doctors);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// router.get("/doctors", auth, async (req, res) => {
+//   try {
+//     const doctors = await UserAuthModel.find({ role: "doctor" })
+//       .select("username _id")
+//       .lean();
+//     res.status(200).json(doctors);
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 // Get a single patient by ID
 router.get("/patients/:id", auth, async (req, res) => {

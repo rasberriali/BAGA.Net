@@ -96,6 +96,16 @@ const PatientActivity = () => {
     return Object.keys(errors).length === 0;
   };
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData({ name: '', location: '', age: '', gender: '' });
+    setFiles([]);
+    setSubmittedImage(null);
+    setValidationErrors({});
+    setError(null);
+  };
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -143,6 +153,7 @@ const PatientActivity = () => {
       setFormData({ name: '', location: '', age: '', gender: '' });
       setFiles([]);
       fetchPatients();
+      closeModal();
     } catch (error) {
       console.error('Error uploading files:', error);
       const errorMessage = error.response?.data?.message || 'Failed to add patient';
@@ -179,14 +190,27 @@ const PatientActivity = () => {
               />
               <img src={search} alt="Search icon" className="w-5 h-5 -ml-8 cursor-pointer mt-2" />
             </div>
-            <div className="flex flex-row ml-6">
+            <div className="flex flex-row ml-6 ">
               <div>
+
+                <div className='flex flex-row gap-2'>
                 <div
                   className="p-2 px-6 text-base text-white bg-lime-500 rounded-lg hover:bg-lime-600 cursor-pointer"
                   onClick={() => setIsModalOpen(true)}
                 >
                   Add Patient
                 </div>
+
+                <div
+                  className="p-2 px-6 text-base text-white bg-lime-500 rounded-lg hover:bg-lime-600 cursor-pointer"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  Grab Model
+                </div>
+                </div>
+                
+
+                
                 {isModalOpen && (
                   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                     <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-96">
