@@ -8,6 +8,7 @@ import recall from "../../images/memory-recall.png"
 import precision from "../../images/precision.png"
 import history from "../../images/history.png"
 import training2 from "../../images/work-in-progress.png"
+import * as tf from '@tensorflow/tfjs';
 
 import { Button } from "@/components/ui/button"
 import {
@@ -30,16 +31,11 @@ import {
 } from "@/components/ui/carousel"
 
 // TensorFlow.js training utilities and submission
-import {
-  fetchTfjsModel,
-  prepareData,
-  trainModel,
-  submitTrainedModel,
-  manualPurgeUsedImages,
-  getImagesByTrainingStatus,
-} from './tfjs.js'
-
+import { ds } from './data.js';
+import { trainModel } from './training.js';
+import { fetchTfjsModel, manualPurgeUsedImages } from './io.js';
 import { getAllStoredImages, getStorageStats } from '../utils/indexedDBUtils.js';
+import { prepareData } from './preprocessing.js'
 
 const Metrics = () => {
   const [progress, setProgress] = useState(0)
@@ -139,20 +135,23 @@ const Metrics = () => {
       const { model, trainingParams } = await fetchModelWithRetry();
       setProgress(20);
   
-      // Continue with existing code for preparing data
+
       setCurrentPhase('validation');
       setProgress(25);
+
+
+      setCurrentPhase('preprocessing');
       const prepared = await prepareData(images, p => setProgress(25 + p * 0.25));
   
-      // Continue with the rest of your existing training code...
       setCurrentPhase('testing');
       const results = await trainModel(
-        prepared,
-        p => setProgress(50 + p * 0.4),
-        epoch => setEpochInfo(prev => [...prev, epoch]),
-        true // submitToServer
+        prepared,                                // preparedData
+        p      => setProgress(50 + p * 0.4),     // progressCallback
+        epoch  => setEpochInfo(prev => [...prev, epoch]), // epochCallback
+        true,                                    // submitToServer
+        phase  => setCurrentPhase(phase),        // phaseCallback
+        p      => setWeightsSendProgress(p)      // weightsProgressCallback
       );
-      setProgress(95);
   
       // Update local metrics
       setLocalMetrics({ 

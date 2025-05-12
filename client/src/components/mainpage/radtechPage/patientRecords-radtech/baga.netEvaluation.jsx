@@ -2,12 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { InferenceSession, env, Tensor } from 'onnxruntime-web';
 import axios from 'axios';
 import { storeModel, getModel, storeExists, getDatabaseVersion } from '../../../utils/indexedDBUtils';
+import * as ort from 'onnxruntime-web';
 
-env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/";
+env.wasm.numThreads         = 1;
+env.wasm.simd               = true;
+env.wasm.proxy              = false;
+env.wasm.enableWasmStreaming = false;
 
+
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@latest/dist/'; 
+
+
+const checkWasmSupport = async () => {
+  if (!WebAssembly) {
+    throw new Error("WebAssembly is not supported in this browser");
+  }
+  
+  try {
+    // Test if we can instantiate WebAssembly
+    const module = await WebAssembly.compile(new Uint8Array([0,97,115,109,1,0,0,0]));
+    return true;
+  } catch (e) {
+    console.error("WebAssembly compilation test failed:", e);
+    return false;
+  }
+};
 // Auth utilities
 const getAuthToken = async (clientId = "web-client") => {
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:5050";
   const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
   
   try {
@@ -32,7 +54,7 @@ const getAuthToken = async (clientId = "web-client") => {
 };
 
 export default function BAGANETEvaluation({ patientId, xrayImages }) {
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:5050";
   const backendApiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
   const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
 
@@ -49,6 +71,8 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
   const [loadingEvaluation, setLoadingEvaluation] = useState(false);
   const [errorEvaluation, setErrorEvaluation] = useState(null);
   const [diagnosisOutput, setDiagnosisOutput] = useState('');
+  // 3. FIX - Add WASM support state
+  const [wasmSupported, setWasmSupported] = useState(true);
 
   const fetchModelEvaluation = async () => {
     if (!patientId) {
@@ -98,37 +122,57 @@ export default function BAGANETEvaluation({ patientId, xrayImages }) {
   };
 
   useEffect(() => {
-    // Initialize authentication on component mount
-    const initAuth = async () => {
+    // 4. FIX - First check WASM support before any other initialization
+    const init = async () => {
       try {
-        // Check if we already have a token
-        let token = localStorage.getItem('fedml_token');
+        const isWasmSupported = await checkWasmSupport();
+        setWasmSupported(isWasmSupported);
         
-        if (!token) {
-          // Get a new token
-          token = await getAuthToken();
+        if (!isWasmSupported) {
+          setError("WebAssembly is not supported in this browser. The application cannot run locally.");
+          // Force server inference mode if WASM not supported
+          setInferenceMode('server');
+          return;
         }
         
-        setAuthToken(token);
+        // Rest of initialization
+        const initAuth = async () => {
+          try {
+            // Check if we already have a token
+            let token = localStorage.getItem('fedml_token');
+            
+            if (!token) {
+              // Get a new token
+              token = await getAuthToken();
+            }
+            
+            setAuthToken(token);
+          } catch (err) {
+            console.error("Authentication failed:", err);
+            setError("Authentication failed. Please try again later.");
+          }
+        };
+    
+        await initAuth();
+        await fetchModelEvaluation();
+        
+        // Set initial image preview if images are available
+        if (xrayImages && xrayImages.length > 0) {
+          setImagePreview(`data:image/jpeg;base64,${xrayImages[selectedImage]}`);
+        }
+        
+        // Check if OpenCV is loaded
+        if (!window.cv) {
+          console.error("OpenCV.js not loaded yet!");
+          setError("OpenCV.js is not loaded. Please make sure it's properly included in your HTML.");
+        }
       } catch (err) {
-        console.error("Authentication failed:", err);
-        setError("Authentication failed. Please try again later.");
+        console.error("Initialization error:", err);
+        setError(`Initialization failed: ${err.message}`);
       }
     };
-
-    initAuth();
-    fetchModelEvaluation();
     
-    // Set initial image preview if images are available
-    if (xrayImages && xrayImages.length > 0) {
-      setImagePreview(`data:image/jpeg;base64,${xrayImages[selectedImage]}`);
-    }
-    
-    // Check if OpenCV is loaded
-    if (!window.cv) {
-      console.error("OpenCV.js not loaded yet!");
-      setError("OpenCV.js is not loaded. Please make sure it's properly included in your HTML.");
-    }
+    init();
   }, [xrayImages, selectedImage, backendApiUrl]);
 
   const loadOrDownloadModel = async () => {

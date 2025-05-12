@@ -11,8 +11,7 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-app.use('/models', express.static(path.join(__dirname, 'static/models')));
-app.use(cors());
+app.use('/models', express.static(path.join(__dirname, 'static/models')));;
 
 const limiter = rateLimit({
   windowMs: 30 * 60 * 1000, 
@@ -42,7 +41,7 @@ const authLimiter = rateLimit({
 });
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://baga-net.vercel.app","https://baga-net-backend.vercel.app", "http://localhost:5050", "https://BagaNet.loca.lt"],
+  origin: ["http://localhost:5173", "https://baga-net.vercel.app","https://baga-net-backend.vercel.app", "http://localhost:5050", "https://2f58-158-62-8-230.ngrok-free.app"],
   methods: ["GET", "POST", "DELETE", "PUT", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
   credentials: true

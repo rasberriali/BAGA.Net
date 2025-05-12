@@ -1,10 +1,57 @@
 // tfjsTraining.js
 
+
+import '@tensorflow/tfjs-backend-cpu';
+await tf.setBackend('cpu');
+import * as tf from '@tensorflow/tfjs';
+
+
+// Call this at the start of your application
+setupTensorFlow().catch(console.error);
+
 // Utilities for training with image management/purging capabilities and TensorFlow.js model integration
-import { openDatabase, getAllImageIds, markImagesAsUsed, purgeUsedImages, getImagesByTrainingStatus, getModel, storeModel } from '../utils/indexedDBUtils.js';
+import { openDatabase, getAllImageIds, markImagesAsUsed, purgeUsedImages, getImagesByTrainingStatus, getModel, storeModel, processImagesInBatches } from '../utils/indexedDBUtils.js';
 
 
+/** 
+ * Async generator yielding {xs, ys} examples 
+ * where xs is a tensor and ys is a one-hot label.
+ */
+async function* indexedDBGenerator(batchSize = 32) {
+  // processImagesInBatches uses your IndexedDB batched reader under the hood
+  // to grab `batchSize` records at a time.
+  const examples = await processImagesInBatches(
+    async (batch) => {
+      return batch.map(record => {
+        const img = record.imageBlob;           // Blob from IndexedDB
+        const tensor = tf.tidy(() =>
+          tf.browser
+            .fromPixels(img)                   // decode to tensor
+            .resizeNearestNeighbor([224,224])  // example resize
+            .toFloat()
+            .div(255.0)                        // normalize
+        );
+        const label = tf.oneHot(
+          parseInt(record.classificationIndex), // assume you stored an index
+          numClasses
+        );
+        return { xs: tensor, ys: label };
+      });
+    },
+    batchSize
+  );
 
+  for (const ex of examples) {
+    yield ex;
+  }
+}
+
+// Then build your Dataset:
+const ds = tf.data
+  .generator(() => indexedDBGenerator(64))
+  .shuffle(64 * 2)        // buffer twice your batch
+  .batch(64)
+  .prefetch( tf.data.AUTOTUNE );
 
 // Re-export the necessary functions that metrics.jsx is trying to import
 export { getImagesByTrainingStatus };
@@ -97,6 +144,33 @@ export async function fetchTfjsModel(progressCallback = () => {}) {
   };
 
   // Try loading from IndexedDB first
+  try {
+    console.log('🔄 Attempting to load quantized INT8 model from IndexedDB…');
+    const int8Model = await tf.loadLayersModel('indexeddb://tfjs_int8');
+    console.log('✅ Loaded INT8 model from IndexedDB');
+    return {
+      model: int8Model,
+      trainingParams: defaultParams,
+      modelType: 'int8'
+    };
+  } catch (errInt8) {
+    console.warn('⚠️  Could not load INT8 model:', errInt8);
+  }
+
+  // 2. Fallback: load the full-precision model
+  try {
+    console.log('🔄 Attempting to load full-precision model from IndexedDB…');
+    const fullModel = await tf.loadLayersModel('indexeddb://tfjs_full');
+    console.log('✅ Loaded full-precision model from IndexedDB');
+    return {
+      model: fullModel,
+      trainingParams: defaultParams,
+      modelType: 'full'
+    };
+  } catch (errFull) {
+    console.warn('⚠️  Could not load full-precision model:', errFull);
+  }
+  
   try {
     
     const model = await tf.loadLayersModel('indexeddb://tfjs_default');
@@ -284,357 +358,204 @@ export const prepareData = async (images, progressCallback = () => {}) => {
 };
 
 /**
- * Trains a model using the prepared data and TensorFlow.js
- * @param {Object} preparedData - Data prepared by prepareData function
- * @param {Function} progressCallback - Callback for progress updates
- * @param {Function} epochCallback - Callback for epoch completion
- * @param {Boolean} submitToServer - Whether to automatically submit the model to the server
- * @returns {Object} - Training results and metrics
+ * Optimized training pipeline with GPU memory management and detailed logging
+ * @param {Object} preparedData - Data prepared by prepareData()
+ * @param {Function} progressCallback - Updates overall progress (0–1)
+ * @param {Function} epochCallback - Called at end of each epoch with {epoch, valLoss, valAccuracy}
+ * @param {Boolean} submitToServer - Whether to POST the final model & metrics
+ * @returns {Object} - {model, version, timestamp, loss, accuracy, precision, recall, f1Score, trainSize, valSize, testSize}
  */
 export const trainModel = async (
-    preparedData, 
-    progressCallback = () => {}, 
-    epochCallback = () => {},
-    submitToServer = false
-  ) => {
-    try {
-      if (!isBrowser) {
-        throw new Error("This function requires a browser environment");
-      }
-  
-      if (!preparedData || !preparedData.train || preparedData.train.length === 0) {
-        throw new Error("Invalid prepared data for training");
-      }
-      
-      // Add detailed logging
-      console.log("Training data:", {
-        trainSize: preparedData.train?.length || 0,
-        validationSize: preparedData.validation?.length || 0,
-        testSize: preparedData.test?.length || 0,
-        classes: preparedData.classes
-      });
-      
-      progressCallback(0);
-      
-      console.log("Starting model training process with TensorFlow.js...");
-      
-      // Number of classes
-      const numClasses = preparedData.classes.length;
-      
-      // Import TensorFlow.js
-      const tf = await import('@tensorflow/tfjs');
-      
-      // Fetch the TensorFlow.js model from the server
-      const modelData = await fetchTfjsModel((progress) => {
-        // Map model fetching progress to 0-20% of overall progress
-        progressCallback(progress * 0.2);
-      });
-      
-      console.log("TensorFlow.js model fetched successfully");
-      progressCallback(0.2);
-      
-      // Get the model and training parameters
-      const model = modelData.model;
-      const trainingParams = modelData.trainingParams;
-      
-      // Convert prepared data to TensorFlow.js tensors
-      console.log("Converting data to TensorFlow.js tensors...");
-      
-      // Create TensorFlow.js datasets from our prepared data
-      const { trainDataset, valDataset, testDataset } = await createTensorflowDatasets(
-        preparedData.train,
-        preparedData.validation,
-        preparedData.test,
-        numClasses,
-        trainingParams.batch_size
-      );
-      
-      progressCallback(0.3);
-      
-      // Compile the model
-      model.compile({
-        optimizer: tf.train.adam(trainingParams.learning_rate),
-        loss: 'categoricalCrossentropy',
-        metrics: ['accuracy']
-      });
-      
-      // Check if we have enough data for training
-      if (preparedData.train.length < trainingParams.min_local_samples || preparedData.validation.length < 2) {
-        console.warn("Not enough data for proper training. Using simulated training results.");
-        
-        // Simulate training if not enough data
-        for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
-          // Simulate training progress
-          const simulatedMetrics = {
-            epoch: epoch + 1,
-            trainLoss: 1.0 - (epoch * 0.1),
-            loss: 1.0 - (epoch * 0.1),
-            trainAccuracy: 0.5 + (epoch * 0.05),
-            accuracy: 0.5 + (epoch * 0.05),
-            valLoss: 1.1 - (epoch * 0.1),
-            valAccuracy: 0.45 + (epoch * 0.05)
-          };
-          
-          // Report progress
-          progressCallback(0.3 + ((epoch + 1) / trainingParams.epochs) * 0.5);
-          
-          // Report epoch results
-          epochCallback(simulatedMetrics);
-          
-          // Simulate some training time
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        // Calculate simulated final metrics
-        const finalMetrics = {
-          accuracy: 0.75,
-          loss: 0.5,
-          precision: 0.73,
-          recall: 0.71,
-          f1Score: 0.72
-        };
-        
-        progressCallback(0.9);
-        
-        // Mark images as used in IndexedDB
-        if (preparedData.imageIds && preparedData.imageIds.length > 0) {
-          try {
-            await markImagesAsUsed(preparedData.imageIds);
-            console.log(`Successfully marked ${preparedData.imageIds.length} images as used`);
-          } catch (error) {
-            console.error("Error marking images as used:", error);
-          }
-        }
-        
-        // Generate a version string
-        const modelVersion = `${Date.now().toString()}-v1`;
-        
-        // Create the training results
-        const modelArtifacts = await model.save(tf.io.withSaveHandler(async modelArtifacts => {
-          const modelVersionId = `tfjs_${Date.now()}`;
-          await storeModel(modelArtifacts, modelVersionId, 'xrayImagesDB');
+  preparedData,
+  progressCallback = () => {},
+  epochCallback = () => {},
+  submitToServer = false
+) => {
+  try {
+    if (!isBrowser) throw new Error("This function requires a browser environment");
+    if (!preparedData.train?.length) throw new Error("Invalid prepared data for training");
 
-          return modelArtifacts;
-        }));
-        
-        const trainingResults = {
-          model,
-          modelData: modelArtifacts,
-          accuracy: Number(finalMetrics.accuracy).toFixed(4),
-          loss: Number(finalMetrics.loss).toFixed(4),
-          precision: Number(finalMetrics.precision).toFixed(4),
-          recall: Number(finalMetrics.recall).toFixed(4),
-          f1Score: Number(finalMetrics.f1Score).toFixed(4),
-          version: `${Date.now().toString()}-v1`,
-          classDistribution: preparedData.distribution,
-          trainSize: preparedData.train.length,
-          valSize: preparedData.validation.length,
-          testSize: preparedData.test.length,
-          usedImageIds: preparedData.imageIds || [],
-          timestamp: new Date().toISOString()
-        };
-        
-        const weightMap = {};
-        model.getWeights().forEach((tensor, idx) => {
-          const name = model.layers[idx]?.name || `layer${idx}`;
-          weightMap[`${name}`] = Array.from(tensor.dataSync());
-        });
-        trainingResults.weights = weightMap;
-
-        // Submit trained model to server if requested
-        if (submitToServer) {
-            progressCallback(0.95);
-            try {
-              // Collect system metrics
-              const systemMetrics = {
-                browser: navigator.userAgent,
-                platform: navigator.platform,
-                memoryInfo: window.performance?.memory ? {
-                  usedJSHeapSize: window.performance.memory.usedJSHeapSize,
-                  totalJSHeapSize: window.performance.memory.totalJSHeapSize
-                } : null,
-                trainingTime: 500 * trainingParams.epochs, // Simulated time in ms
-                simulatedTraining: true
-              };
-              
-              // Use the function defined in this file - no import needed
-              const submitResult = await submitTrainedModel(trainingResults, systemMetrics);
-              console.log("Model submission result:", submitResult);
-              
-              // Add submission result to training results
-              trainingResults.submitted = true;
-              trainingResults.submissionResult = submitResult;
-            } catch (error) {
-              console.error("Error submitting trained model:", error);
-              trainingResults.submitted = false;
-              trainingResults.submissionError = error.message;
-            }
-          }
-        
-        progressCallback(1);
-        return trainingResults;
-      }
-      
-      // Perform actual training with TensorFlow.js
-      let bestAccuracy = 0;
-      let finalMetrics = {
-        accuracy: 0,
-        loss: 0,
-        precision: 0,
-        recall: 0,
-        f1Score: 0
-      };
-      
-      // For measuring training time
-      const trainingStartTime = performance.now();
-      
-      // Train the model
-      for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
-        console.log(`Training epoch ${epoch + 1}/${trainingParams.epochs}`);
-        
-        // Train for one epoch
-        const trainResult = await model.fitDataset(trainDataset, {
-          epochs: 1,
-          validationData: valDataset,
-          callbacks: {
-            onBatchEnd: (batch, logs) => {
-              console.log(`Batch ${batch}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.acc.toFixed(4)}`);
-            }
-          }
-        });
-        
-        // Extract metrics from training result
-        const trainLoss = trainResult.history.loss[0];
-        const trainAccuracy = trainResult.history.acc[0];
-        const valLoss = trainResult.history.val_loss ? trainResult.history.val_loss[0] : null;
-        const valAccuracy = trainResult.history.val_acc ? trainResult.history.val_acc[0] : null;
-        
-        // Create metrics object for callback
-        const epochMetrics = {
-          epoch: epoch + 1,
-          trainLoss,
-          loss: trainLoss, // Add both names for compatibility
-          trainAccuracy,
-          accuracy: trainAccuracy, // Add both names for compatibility
-          valLoss: valLoss !== null ? valLoss : trainLoss * 1.1,
-          valAccuracy: valAccuracy !== null ? valAccuracy : trainAccuracy * 0.95
-        };
-        
-        // Keep track of best accuracy
-        if (valAccuracy !== null && valAccuracy > bestAccuracy) {
-          bestAccuracy = valAccuracy;
-        }
-        
-        // Report progress
-        progressCallback(0.3 + ((epoch + 1) / trainingParams.epochs) * 0.5);
-        
-        // Report epoch results
-        epochCallback(epochMetrics);
-      }
-      
-      // Calculate training time
-      const trainingEndTime = performance.now();
-      const trainingTimeMs = trainingEndTime - trainingStartTime;
-      await markImagesAsUsed(preparedData.imageIds);
-      
-      // Evaluate on test set for final metrics
-      let testResults = { loss: 0, acc: 0 };
-      
-      if (testDataset) {
-        console.log(`Evaluating test data: ${preparedData.test.length} samples`);
-        testResults = await model.evaluateDataset(testDataset);
-      }
-      
-      // Extract metrics
-      const testLoss = Array.isArray(testResults) ? testResults[0].dataSync()[0] : testResults.loss;
-      const testAccuracy = Array.isArray(testResults) ? testResults[1].dataSync()[0] : testResults.acc;
-      
-      // Calculate confusion matrix and other metrics
-      const confusionMatrix = await calculateConfusionMatrix(model, preparedData.test, numClasses);
-      const additionalMetrics = calculateAdditionalMetrics(confusionMatrix);
-      
-      // Update final metrics
-      finalMetrics = {
-        accuracy: testAccuracy,
-        loss: testLoss,
-        ...additionalMetrics
-      };
-      
-      progressCallback(0.9);
-      
-      // Mark images as used in IndexedDB
-      if (preparedData.imageIds && preparedData.imageIds.length > 0) {
-        try {
-          await markImagesAsUsed(preparedData.imageIds);
-          console.log(`Successfully marked ${preparedData.imageIds.length} images as used`);
-        } catch (error) {
-          console.error("Error marking images as used:", error);
-        }
-      }
-      
-      // Generate a version string
-      const modelVersion = `${Date.now().toString()}-v1`;
-      
-      // Create the training results
-      const trainingResults = {
-        model: model,
-        modelData: await model.save(tf.io.withSaveHandler(async modelArtifacts => modelArtifacts)),
-        accuracy: Number(finalMetrics.accuracy).toFixed(4),
-        loss: Number(finalMetrics.loss).toFixed(4),
-        precision: Number(finalMetrics.precision).toFixed(4),
-        recall: Number(finalMetrics.recall).toFixed(4),
-        f1Score: Number(finalMetrics.f1Score).toFixed(4),
-        version: modelVersion,
-        classDistribution: preparedData.distribution,
-        trainSize: preparedData.train.length,
-        valSize: preparedData.validation.length,
-        testSize: preparedData.test.length,
-        usedImageIds: preparedData.imageIds || [],
-        timestamp: new Date().toISOString()
-      };
-      
-
-      // Submit trained model to server if requested
-      if (submitToServer) {
-        progressCallback(0.95);
-        try {
-          // Collect system metrics
-          const systemMetrics = {
-            browser: navigator.userAgent,
-            platform: navigator.platform,
-            memoryInfo: window.performance?.memory ? {
-              usedJSHeapSize: window.performance.memory.usedJSHeapSize,
-              totalJSHeapSize: window.performance.memory.totalJSHeapSize
-            } : null,
-            trainingTime: trainingTimeMs,
-            epochs: trainingParams.epochs,
-            batchSize: trainingParams.batch_size
-          };
-          
-          // Use the function defined in this file - no import needed
-          const submitResult = await submitTrainedModel(trainingResults, systemMetrics);
-          console.log("Model submission result:", submitResult);
-          
-          // Add submission result to training results
-          trainingResults.submitted = true;
-          trainingResults.submissionResult = submitResult;
-        } catch (error) {
-          console.error("Error submitting trained model:", error);
-          trainingResults.submitted = false;
-          trainingResults.submissionError = error.message;
-        }
-      }
-      
-      progressCallback(1);
-      return trainingResults;
-    } catch (error) {
-      console.error("Error in model training process:", error);
-      throw error;
+    console.log("Training sizes:", {
+      train: preparedData.train.length,
+      validation: preparedData.validation?.length,
+      test: preparedData.test?.length,
+      classes: preparedData.classes
+    });
+    progressCallback(0);
+    
+    if (tf.getBackend() !== 'webgl' && tf.getBackend() !== 'wasm') {
+      await tf.setBackend('wasm');
     }
-  };
+    await tf.ready();
+    
+    // === Backend setup ===
+    const backendName = tf.getBackend();
+    if (backendName !== 'webgl') {
+      try {
+        console.log("Setting up WebGL backend…");
+        tf.env().set('WEBGL_PACK', false);
+        await tf.setBackend('webgl');
+        if (tf.getBackend() === 'webgl') {
+          tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+          console.log('🔧 WebGL mixed precision enabled (F16 textures)');
+        }
+        const flags = Object.keys(tf.env().flags);
+        if (flags.includes('WEBGL_FORCE_F32_TEXTURES')) {
+          tf.env().set('WEBGL_FORCE_F32_TEXTURES', true);
+          console.log("F32 textures enabled");
+        }
+      } catch (e) {
+        console.warn("WebGL failed, falling back to CPU:", e);
+        await tf.setBackend('cpu');
+      }
+    }
+    console.log("Using backend:", tf.getBackend());
+
+    // === Fetch model & params ===
+    const { model, trainingParams } = await fetchTfjsModel(p => progressCallback(p * 0.2));
+    progressCallback(0.2);
+
+    // === Build datasets ===
+    const makeDataset = (dataArray) =>
+      dataArray?.length
+        ? tf.data
+            .generator(function* () {
+              const arr = [...dataArray];
+              shuffleArray(arr);
+              for (const item of arr) {
+                const { xs, ys } = tf.tidy(() => {
+                  const x = tf.tensor3d(Array.from(item.data), [item.height, item.width, 3]);
+                  const y = tf.oneHot(item.label, preparedData.classes.length);
+                  return { xs: x, ys: y };
+                });
+                yield { xs, ys };
+              }
+            })
+            .batch(trainingParams.batch_size)
+        : null;
+
+    const trainDataset = makeDataset(preparedData.train);
+    const valDataset   = makeDataset(preparedData.validation);
+    const testDataset  = makeDataset(preparedData.test);
+    progressCallback(0.3);
+
+    // === Compile ===
+    model.compile({
+      optimizer: tf.train.adam(trainingParams.learning_rate),
+      loss: 'categoricalCrossentropy',
+      metrics: ['accuracy']
+    });
+
+    // === Small-data simulation ===
+    if (
+      preparedData.train.length < trainingParams.min_local_samples ||
+      (preparedData.validation?.length || 0) < 2
+    ) {
+      return simulateTraining();
+    }
+
+    // === Training loop with logging ===
+    const numBatches = Math.ceil(preparedData.train.length / trainingParams.batch_size);
+    let bestValAcc = 0;
+    const startTime = performance.now();
+
+    for (let epoch = 0; epoch < trainingParams.epochs; epoch++) {
+      console.log(`--- Epoch ${epoch+1}/${trainingParams.epochs} START ---`);
+      console.log('Before epoch memory:', tf.memory());
+
+      let batchIndex = 0;
+      await trainDataset.forEachAsync(async ({ xs, ys }) => {
+        batchIndex++;
+        console.log(`Epoch ${epoch+1}, Batch ${batchIndex}/${numBatches} — start`);
+
+        tf.tidy(() => {
+          const logits = model.predict(xs);
+          const loss   = tf.losses.softmaxCrossEntropy(ys, logits).mean();
+          const grads  = tf.variableGrads(() => loss);
+          model.optimizer.applyGradients(grads.grads);
+          Object.values(grads.grads).forEach(t => t.dispose());
+          loss.dispose();
+        });
+
+        console.log(`Epoch ${epoch+1}, Batch ${batchIndex}/${numBatches} — done`);
+      });
+
+      // Validation
+      const evalRes = await model.evaluateDataset(valDataset);
+      const valLoss = Array.isArray(evalRes) ? evalRes[0].dataSync()[0] : evalRes.loss;
+      const valAcc  = Array.isArray(evalRes) ? evalRes[1].dataSync()[0] : evalRes.acc;
+      bestValAcc = Math.max(bestValAcc, valAcc);
+
+      const metrics = { epoch: epoch+1, valLoss, valAccuracy: valAcc };
+      epochCallback(metrics);
+      progressCallback(0.3 + ((epoch+1)/trainingParams.epochs)*0.5);
+
+      console.log('After epoch memory:', tf.memory());
+      console.log(`--- Epoch ${epoch+1}/${trainingParams.epochs} END ---`);
+      await tf.nextFrame();
+    }
+
+    // === Post-training ===
+    const trainTime = performance.now() - startTime;
+    await markImagesAsUsed(preparedData.imageIds);
+
+    let testLoss = 0, testAcc = 0;
+      if (testDataset) {
+        const res = await model.evaluateDataset(testDataset);
+        [ testLoss, testAcc ] = Array.isArray(res)
+          ? [ res[0].dataSync()[0], res[1].dataSync()[0] ]
+          : [ res.loss, res.acc ];
+      }
+      
+
+      // NEW: compute confusion matrix & additional metrics
+      const confusionMatrix = await calculateConfusionMatrix(model, preparedData.test, preparedData.classes.length);
+      const { precision, recall, f1Score } = calculateAdditionalMetrics(confusionMatrix);
+
+      progressCallback(0.9);
+
+      await tf.io.browserIndexedDB.save('indexeddb://tfjs_full', fullPrecisionArtifacts);
+      console.log('📥 Full-precision model stored in IndexedDB');
+      
+      // Store the INT8-quantized version
+      await tf.io.browserIndexedDB.save('indexeddb://tfjs_int8', quantizedArtifacts);
+      console.log('📥 Quantized INT8 model stored in IndexedDB');
+
+      const results = {
+        model,
+        modelData: artifacts,
+        version,
+        timestamp: new Date().toISOString(),
+        loss: testLoss,
+        accuracy: testAcc,
+        precision,       // ← now set
+        recall,          // ← now set
+        f1Score,         // ← now set
+        trainSize: preparedData.train.length,
+        valSize: preparedData.validation?.length,
+        testSize: preparedData.test?.length
+      };
+
+      if (submitToServer) {
+        await submitTrainedModel(results, { trainingTime: trainTime });
+      }
+      
+    progressCallback(1);
+    return results;
+
+  } catch (err) {
+    console.error("Error in optimized training:", err);
+    throw err;
+  }
+};
 
 
 // ---- Helper functions ----
+
+
+
+
+
 
 /**
  * Creates TensorFlow.js datasets from processed image data
@@ -1290,109 +1211,107 @@ const calculateAdditionalMetrics = (confusionMatrix) => {
   }
   
 
-/**
- * Submits trained model weights and metrics to the server
- * @param {Object} trainedModel - Trained TensorFlow.js model and related data
- * @param {Object} systemMetrics - Optional system metrics about the training environment
- * @returns {Promise<Object>} - Server response data
- */
-export const submitTrainedModel = async (trainedModel, systemMetrics = {}) => {
-  try {
-    if (!trainedModel || !trainedModel.model) {
-      throw new Error("No trained model provided");
-    }
-    
-    console.log("Preparing to submit trained model to server...");
-
-    // Extract model artifacts for submission
-    const modelArtifacts = await trainedModel.model.save(
-      tf.io.withSaveHandler(async artifacts => artifacts)
-    );
-    
-    // Format the weights data in the way the server expects
-    const weightsData = {};
-    
-    // Format depends on the TensorFlow.js version and model format
-    if (modelArtifacts.weightData) {
-      // Handle binary weight format (more efficient)
-      // The server expects a JSON structure, so we'll need to convert the binary weights
-      
-      // Create a mapping of weight names to their values
-      const weightSpecs = modelArtifacts.weightSpecs;
-      let offset = 0;
-      
-      // Convert the binary weight data to a structured format
-      for (const spec of weightSpecs) {
-        const key = spec.name;
-        const shape = spec.shape;
-        const size = shape.reduce((a, b) => a * b, 1);
-        const dataType = spec.dtype;
-        
-        // Create a view into the arraybuffer for this weight
-        const typedArray = getTypedArrayForDType(dataType, modelArtifacts.weightData, offset, size);
-        
-        // Convert to regular array for JSON serialization
-        weightsData[key] = Array.from(typedArray);
-        
-        // Move the offset for the next weight
-        offset += size * bytesPerElement(dataType);
-      }
-    } else if (modelArtifacts.weights) {
-      // Handle direct weights object format
-      for (const key in modelArtifacts.weights) {
-        const tensor = modelArtifacts.weights[key];
-        weightsData[key] = Array.from(tensor.dataSync());
-      }
-    } else {
-      throw new Error("Unsupported model artifact format");
-    }
-    
-    // Prepare payload that matches the server's expected format
-    const payload = {
-      weights: weightsData,
-      metrics: {
-        accuracy: parseFloat(trainedModel.accuracy || 0),
-        loss: parseFloat(trainedModel.loss || 0),
-        precision: parseFloat(trainedModel.precision || 0),
-        recall: parseFloat(trainedModel.recall || 0),
-        f1Score: parseFloat(trainedModel.f1Score || 0)
-      },
-      round: 0, // Default to round 0, could be passed as parameter if needed
-      num_samples: trainedModel.trainSize || 0,
-      timestamp: new Date().toISOString(),
-      system_metrics: systemMetrics
-    };
-    
-    console.log("Submitting trained model to server...");
-    
-    // Get JWT and API credentials
-    const JWT = localStorage.getItem('jwtToken');
-    const API_KEY = "FeDMl2025"; // Should be loaded securely
-    const CLIENT_ID = localStorage.getItem('clientId') || `client-${Date.now()}`;
-    
-    // Make the API request
-    const response = await fetch("http://localhost:5050/tfjs/submit_weights", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-Client-ID': CLIENT_ID,
-        'Authorization': `Bearer ${JWT}`
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`Server error: ${error.message || response.statusText}`);
-    }
-    
-    const result = await response.json();
-    console.log("Model submission successful:", result);
-    
-    return result;
-  } catch (error) {
-    console.error("Error submitting trained model:", error);
-    throw error;
+  
+/** Returns BYTES per element for a given dtype */
+function bytesPerElement(dtype) {
+  switch (dtype) {
+    case 'float32': return 4;
+    case 'int32':   return 4;
+    case 'bool':    return 1;
+    default: throw new Error(`Unsupported dtype ${dtype}`);
   }
-};
+}
+
+/** 
+ * Creates a typed array view into an ArrayBuffer 
+ * @param {'float32'|'int32'|'bool'} dtype 
+ * @param {ArrayBuffer} buffer 
+ * @param {number} offsetElems  // offset in ELEMENTS, not bytes
+ * @param {number} lengthElems  // number of elements
+ */
+function getTypedArrayForDType(dtype, buffer, offsetElems, lengthElems) {
+  const byteOffset = offsetElems * bytesPerElement(dtype);
+  switch (dtype) {
+    case 'float32': return new Float32Array(buffer, byteOffset, lengthElems);
+    case 'int32':   return new Int32Array(buffer, byteOffset, lengthElems);
+    case 'bool':    return new Uint8Array(buffer, byteOffset, lengthElems);
+    default: throw new Error(`Unsupported dtype ${dtype}`);
+  }
+}
+
+/**
+ * Submits trained model weight arrays and metrics via multipart/form-data
+ * so the binary weightData → JSON conversion happens only once.
+ *
+ * @param {Object} trainedModel  // should include `.model`, `.accuracy`, `.loss`, `.round`, `.trainSize`, etc.
+ * @param {Object} systemMetrics optional
+ */
+export async function submitTrainedModel(trainedModel, systemMetrics = {}) {
+  
+  if (!trainedModel || !trainedModel.model) {
+    throw new Error("No trained model provided");
+  }
+
+  // 1) extract artifacts without touching the network
+  const artifacts = await trainedModel.model.save(
+    tf.io.withSaveHandler(x => Promise.resolve(x))
+  );
+  // artifacts: { weightSpecs: [...], weightData: ArrayBuffer }
+
+  // 2) unpack into a plain object { weightName: [ ...values ] }
+  const { weightSpecs, weightData } = artifacts;
+  const weightsJson = {};
+  let offset = 0;
+  for (const spec of weightSpecs) {
+    const { name, shape, dtype } = spec;
+    const size = shape.reduce((a, b) => a * b, 1);
+    const arr = getTypedArrayForDType(dtype, weightData, offset, size);
+    weightsJson[name] = Array.from(arr);
+    offset += size;  // because getTypedArrayForDType expects offset in elements
+  }
+
+  // 3) build metadata payload
+  const payload = {
+    metrics: {
+      accuracy:   parseFloat(trainedModel.accuracy  || 0),
+      loss:       parseFloat(trainedModel.loss      || 0),
+      precision:  parseFloat(trainedModel.precision || 0),
+      recall:     parseFloat(trainedModel.recall    || 0),
+      f1Score:    parseFloat(trainedModel.f1Score   || 0)
+    },
+    round:       trainedModel.round     || 0,
+    num_samples: trainedModel.trainSize || 0,
+    timestamp:   new Date().toISOString(),
+    system_metrics: systemMetrics
+  };
+
+  // 4) assemble multipart form
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  form.append('weights',  new Blob([JSON.stringify(weightsJson)], { type: 'application/json' }), 'weights.json');
+
+  // 5) headers: API key + optional JWT + client ID
+  const API_KEY    = "FeDMl2025";  // ideally injected via env
+  const CLIENT_ID  = localStorage.getItem('clientId') || `client-${Date.now()}`;
+  const JWT        = localStorage.getItem('jwtToken');
+  const headers = {
+    'X-API-Key': API_KEY,
+    'X-Client-ID': CLIENT_ID
+  };
+  if (JWT) headers['Authorization'] = `Bearer ${JWT}`;
+
+  // 6) send off
+  const resp = await fetch("http://localhost:5050/tfjs/submit_weights", {
+    method: 'POST',
+    headers,
+    body: form,
+    credentials: 'include'  // ensure cookies/auth on cross-origin if needed
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Submission failed: ${err.message||resp.statusText}`);
+  }
+
+  return resp.json();
+}

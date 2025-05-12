@@ -20,7 +20,7 @@ import {
 } from '../../../utils/indexedDBUtils';
 
 const getAuthToken = async (clientId = "web-client") => {
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:3000";
   const apiKey = process.env.REACT_APP_MODEL_API_KEY || "FeDMl2025";
   
   try {
@@ -47,7 +47,7 @@ const getAuthToken = async (clientId = "web-client") => {
 
 const PatientActivity = () => {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
-  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "https://2f58-158-62-8-230.ngrok-free.app";
+  const modelServerUrl = process.env.REACT_APP_MODEL_SERVER_URL || "http://localhost:5050";
   const [patients, setPatients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -232,6 +232,25 @@ const PatientActivity = () => {
 
 
   const handleGrabModel = async () => {
+    const tf = await import('@tensorflow/tfjs');
+    await import('@tensorflow/tfjs-backend-wasm'); 
+    const preferred = ['wasm', 'cpu'];               // try wasm first, then cpu
+    let actualBackend = null;
+    for (const b of preferred) {
+      try {
+        await tf.setBackend(b);
+        await tf.ready();
+        console.log(`✅ Initialized TFJS backend "${b}"`);
+        actualBackend = b;
+        break;
+      } catch (e) {
+        console.warn(`❌ Could not initialize TFJS backend "${b}"`, e);
+      }
+    }
+    if (!actualBackend) {
+      throw new Error('No usable TFJS backend available');
+    }
+
     try {
       const dbName = 'xrayImagesDB';
       const tf = await import('@tensorflow/tfjs');
