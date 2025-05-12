@@ -32,7 +32,6 @@ export default function DoctorsEvaluation({ evaluation, findings, xrayImages }) 
   return (
     <div>
       <div className="flex flex-row p-6 rounded-lg h-[30vh] bg-gray-100 gap-4">
-        {/* Left Column - Findings */}
         <div className="w-1/2 flex flex-col">
           <div className='text-2xl font-bold text-black'>Impression:</div>
           <div className="w-full text-center text-red-600 flex flex-row mt-2">
@@ -44,15 +43,15 @@ export default function DoctorsEvaluation({ evaluation, findings, xrayImages }) 
           </div>
         </div>
 
-        {/* Right Column - Classification and Images */}
+       
         <div className="w-1/2 flex flex-col">
-          {/* Classification Dropdown */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700">Classification:</label>
             <select
               value={classification}
               onChange={(e) => setClassification(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-2 border-gray-300 text-black bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-2 border-gray-300 text-black bg-white focus:outline-none
+               focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
             >
               <option value="">Select Classification</option>
               <option value="normal">Normal</option>
@@ -62,7 +61,6 @@ export default function DoctorsEvaluation({ evaluation, findings, xrayImages }) 
             </select>
           </div>
 
-          {/* X-ray Images */}
           {xrayImages && xrayImages.length > 0 && (
             <div className=''>
               <div className="text-sm font-medium text-gray-700 mb-2">X-ray Images:</div>

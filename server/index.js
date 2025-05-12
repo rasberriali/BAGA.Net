@@ -82,7 +82,7 @@ mongoose.connect(mongoURI)
 
 // Apply auth rate limiting to auth routes
 app.use('/patients/login', authLimiter);
-app.use('/patients/signup', authLimiter);
+// app.use('/patients/signup', authLimiter);
 
 // Routes
 app.use('/patients', projectRoutes);
