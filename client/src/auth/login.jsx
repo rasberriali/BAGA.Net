@@ -6,6 +6,9 @@ import { AiOutlineMail } from 'react-icons/ai';
 import { LuLock } from 'react-icons/lu';
 import { FcGoogle } from 'react-icons/fc';
 import { FaApple } from 'react-icons/fa';
+import sideImage from "../images/sideImage.jpg"
+import sideImage2 from "../images/sideImage2.svg"
+import bagalogo from "../images/bagalogo.png"
 
 function Login() {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
@@ -60,11 +63,27 @@ function Login() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="relative p-8 rounded-lg shadow-lg max-w-sm w-full bg-white">
-        <div className="absolute top-0 opacity-30 rounded-t-lg left-0 w-full h-48 bg-gradient-to-b from-blue-500 to-transparent"></div>
-
-        <h2 className="text-2xl font-semibold text-slate-900 mb-6 text-center">Welcome Back</h2>
+    <div className="flex  justify-center items-center min-h-screen bg-gray-100">
+      <div className='flex flex-row  justify-between mx-auto max-w-screen-lg'>
+      
+        
+            <div className='flex flex-col w-full '>
+           <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full shadow-2xl shadow-gray-400 rounded-l-lg">
+          <img
+            src={sideImage2}
+            alt="Side"
+            className="w-full h-full object-cover rounded-l-lg shadow-2xl"
+          />
+        </div>
+      </div>
+      </div>
+      <div className="flex flex-col w-1/2 bg-white rounded-r-lg shadow-xl max-w-sm shadow-gray-400 p-8">
+        <div className='flex flex-row items-center justify-center mb-6 gap-2 '>
+                <img src={bagalogo} alt="" className='h-8 w-8'>
+                </img>
+                  <h2 className="text-2xl font-semibold text-slate-900 text-center">Welcome Back</h2>
+              </div>
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
             {error}
@@ -137,8 +156,8 @@ function Login() {
           </button>
 
           {/* Additional Options */}
-          <div className="flex flex-col mt-4 justify-center items-center">
-            <div className="flex flex-row mt-4 justify-center">
+           <div className="flex flex-col mt-4 justify-center items-center">
+            <div className="flex flex-row mt-4 justify-center text-sm text-slate-700">
             <div>
               Don't have an account?{' '}
               <Link to="/signup" className="text-blue-600 hover:underline">
@@ -148,6 +167,7 @@ function Login() {
             </div>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );
