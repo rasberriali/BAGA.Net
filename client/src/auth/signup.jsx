@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; // Added Link for navigation
 import axios from 'axios';
+import sideImage from "../images/sideImage.jpg"
+import bagalogo from "../images/bagalogo.png"
 
 function Signup() {
   const apiUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
@@ -55,9 +57,30 @@ function Signup() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-lg max-w-sm w-full">
-        <h2 className="text-2xl font-bold mb-6 text-center">Sign Up</h2>
+    <div className="flex  justify-center items-center min-h-screen bg-gray-100">
+      <div className='flex flex-row  justify-between mx-auto max-w-screen-lg'>
+
+  
+      <div className='flex flex-col w-full '>
+     <div className="flex flex-col h-full">
+  <div className="flex flex-col h-full shadow-2xl shadow-gray-400 rounded-l-lg">
+    <img
+      src={sideImage}
+      alt="Side"
+      className="w-full h-full object-cover rounded-l-lg shadow-2xl contrast-75"
+    />
+  </div>
+</div>
+
+
+      </div>
+      <div className="flex flex-col w-1/2 bg-white p-8 rounded-r-lg shadow-xl max-w-sm shadow-gray-400">
+      <div className='flex flex-row items-center justify-center mb-6 gap-2'>
+        <img src={bagalogo} alt="" className='h-8 w-8'>
+        </img>
+        <h2 className="text-2xl font-bold text-center">Sign Up</h2>
+      </div>
+        
         <form onSubmit={handleSubmit}>
           {/* First Name and Last Name Fields */}
           <div className="flex flex-row gap-2">
@@ -155,6 +178,8 @@ function Signup() {
           </div>
         </form>
       </div>
+    </div>
+     
     </div>
   );
 }
