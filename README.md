@@ -1,110 +1,115 @@
-🩻 BAGA.Net
-Thesis Project
-🎓 Bachelor of Science in Computer Engineering – Batangas State University, 2025
-Title: "Empowering Lung X-ray Evaluation and Diagnosis Through Federated Machine Learning"
+# 🩻 BAGA.Net – Lung X-ray Diagnosis System
 
-📌 Project Overview
-BAGA.Net is a full-stack web-based medical case management system developed for our undergraduate thesis. It supports secure X-ray image handling, role-based workflows for healthcare professionals, and integrates Federated Machine Learning to protect patient data privacy.
+**Thesis Project**  
+🎓 *Bachelor of Science in Computer Engineering – Batangas State University, 2025*  
+📖 *Title: "Empowering Lung X-ray Evaluation and Diagnosis Through Federated Machine Learning"*
 
-🔧 I primarily led the development of the full-stack web application, focusing on building a secure, and efficient system that interfaces with our machine learning model and supports collaborative clinical workflows.
+A full-stack web application for managing lung X-ray cases, integrating federated machine learning to support privacy-preserving diagnosis workflows between medical professionals.
 
-🧠 Research Highlights
-Diagnosing lung disease via chest X-rays is complex due to:
+---
 
-⚠️ Similar visual patterns across conditions
+## 🧑‍💻 Project Role
 
-🔒 Restrictions around centralized patient data
+- I primarily led the development of the full-stack web system.  
+- Focused on building the core frontend and backend features.  
+- Applied JWT-based authentication for secure access control.  
+- While improvements are still needed in responsiveness and security, the system supports collaborative clinical workflows and ML integration.
 
-To address these, our system:
+---
 
-Combines CNN architectures (YOLOv11, MobileNetV3, VGG16)
+## 🔧 Tech Stack
 
-Applies federated learning across 3 decentralized clients
+- **Frontend**: React (Vite), Tailwind CSS  
+- **Backend**: Node.js, Express.js  
+- **Database**: MongoDB  
+- **Authentication**: JSON Web Tokens (JWT)  
+- **Machine Learning**: Federated ML using FedML, YOLOv11, MobileNetV3, VGG16  
+- **Deployment**: Vercel, AWS S3
 
-Utilizes image preprocessing techniques (Middle Crop, CLAHE, GFB Filter)
+---
 
-📊 Results:
+## 🚀 Key Features
 
-YOLOv11 had the highest performance in a federated setting
+- 🩺 Upload and store X-ray images  
+- 👥 Role-based access for Radtechs and Doctors  
+- 📤 Assign and evaluate medical cases  
+- 📝 Submit and view diagnostic results  
+- 🔐 Secure login and protected routes with JWT  
+- 🌐 Federated training for privacy-preserving ML
 
-MobileNetV3 showed improved accuracy post-aggregation
+---
 
-Federated learning enhanced model performance while ensuring data privacy
+## 🧠 Research Highlights
 
-🛠 Tech Stack
-Layer	Tools & Frameworks
-🖼 Frontend	React (Vite), TailwindCSS
-⚙️ Backend	Node.js, Express.js
-🧠 ML Component	FedML, CNN models
-🗃 Database	MongoDB
-🔐 Authentication	JWT
-☁️ Deployment	Vercel, AWS S3
+- ⚠️ Visual similarities in lung diseases make diagnosis difficult  
+- 🔒 Data privacy regulations prevent central data sharing  
+- 🧠 Combined CNN models (YOLOv11, MobileNetV3, VGG16)  
+- 🧼 Used image preprocessing (Middle Crop, CLAHE, GFB Filter)  
+- 🌐 Implemented Federated Learning with 3 client nodes  
+- 📊 **YOLOv11** achieved best accuracy in federated setting
 
-✨ System Features
-🩺 X-ray image upload and storage
+---
 
-👩‍⚕️ Role-based access for Radtechs and Doctors
+## 🗂 Folder Structure
 
-📤 Case assignment and review workflow
-
-📝 Diagnostic result submission and tracking
-
-🔐 Secure authentication and authorization
-
-🌐 Federated ML integration for decentralized model training
-
-🚀 Getting Started
-✅ Requirements
-Node.js
-
-npm
-
-MongoDB
-
-📦 Setup
-bash
-Copy
-Edit
-git clone https://github.com/rasberriali/BAGA.Net.git
-cd BAGA.Net
-npm install
-🔧 Environment Variables
-Create a .env file with:
-
-env
-Copy
-Edit
-PORT=5000
-MONGO_URI=your_mongodb_uri
-JWT_SECRET=your_jwt_secret
-▶️ Run the Application
-bash
-Copy
-Edit
-npm run dev
-🗂 Folder Structure
-bash
-Copy
-Edit
+```
 BAGA.Net/
 ├── client/         # React frontend
 ├── server/         # Express backend + FedML logic
 ├── public/         # Static files
-├── .env
+├── .env            # Environment config
 └── README.md
-🔮 Future Plans
-🧾 Full case history and audit trail
+```
 
-📈 Admin dashboard for analytics
+---
 
-📬 Email alert system
+## 🛠️ Local Setup
 
-🐳 Dockerized deployment with CI/CD
+### Requirements
 
-🔍 Improved ML explainability and performance
+- Node.js  
+- npm  
+- MongoDB
 
-👩‍💻 Developer Role
-Alysa Juliana M. Emilio
-🧩 Primary developer of the BAGA.Net full-stack web system
-📧 alysaemilio@gmail.com
-🌐 alysaemilio-com.vercel.app
+### Installation
+
+```bash
+git clone https://github.com/rasberriali/BAGA.Net.git
+cd BAGA.Net
+npm install
+```
+
+### Environment Variables
+
+Create a `.env` file in the `server` directory:
+
+```env
+PORT=5000
+MONGO_URI=your_mongodb_uri
+JWT_SECRET=your_jwt_secret
+```
+
+### Run the App
+
+```bash
+npm run dev
+```
+
+---
+
+## 🔮 Future Plans
+
+- 🧾 Full case history and audit trail  
+- 📈 Admin dashboard for analytics  
+- 📬 Email notifications  
+- 🐳 Dockerized CI/CD deployment  
+- 🔍 Enhanced ML explainability and model robustness
+
+---
+
+## 👩‍💻 Developer
+
+**Alysa Juliana M. Emilio**  
+🧩 *Primary developer of the BAGA.Net full-stack web system*  
+📧 [alysaemilio@gmail.com](mailto:alysaemilio@gmail.com)  
+🌐 [alysaemilio-com.vercel.app](https://alysaemilio-com.vercel.app)
