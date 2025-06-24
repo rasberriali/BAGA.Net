@@ -97,16 +97,6 @@ npm run dev
 
 ---
 
-## 🔮 Future Plans
-
-- 🧾 Full case history and audit trail  
-- 📈 Admin dashboard for analytics  
-- 📬 Email notifications  
-- 🐳 Dockerized CI/CD deployment  
-- 🔍 Enhanced ML explainability and model robustness
-
----
-
 ## 👩‍💻 Developer
 
 **Alysa Juliana M. Emilio**  
