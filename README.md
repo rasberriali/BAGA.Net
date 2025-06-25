@@ -39,6 +39,14 @@ A full-stack web application for managing lung X-ray cases, integrating federate
 
 ---
 
+## 📸 Screenshots
+
+|-----------|-----------|--------------|
+| ![](./screenshots/image1.png) | ![](./screenshots/image2.png) |
+| ![](./screenshots/image3.png) | ![](./screenshots/image4.png) |
+
+
+---
 ## 🧠 Research Highlights
 
 - ⚠️ Visual similarities in lung diseases make diagnosis difficult  
