@@ -20,7 +20,7 @@ const PretrainedModels = () => {
           <div className=" "><div className="bg-blue-500 rounded-full px-4 py-2 text-center mt-20">1</div></div>
           <div className=" w-full p-4">
           <div className="text-xl font-medium xl:text-center md:text-center text-left text-slate-200 ">Alex-Net</div>
-          <div className="mt-4 text-left text-sm text-slate-400"> is a deep convolutional neural network (CNN) designed by Alex Krizhevsky for the ImageNet competition in 2012, which significantly improved image classification performance by utilizing deep layers, ReLU activations, and dropout regularization.</div>
+          <div className="mt-4 text-left text-sm text-slate-400"> Is a deep convolutional neural network (CNN) designed by Alex Krizhevsky for the ImageNet competition in 2012, which significantly improved image classification performance by utilizing deep layers, ReLU activations, and dropout regularization.</div>
           </div></div>
 
 

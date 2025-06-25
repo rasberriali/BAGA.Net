@@ -202,7 +202,7 @@ const PatientActivity = () => {
                 </div>
 
                 <div
-                  className="p-2 px-6 text-base text-white bg-lime-500 rounded-lg hover:bg-lime-600 cursor-pointer"
+                  className="p-2 px-6 text-base text-white bg-blue-500 rounded-lg hover:bg-blue-600 cursor-pointer"
                   onClick={() => setIsModalOpen(true)}
                 >
                   Grab Model
